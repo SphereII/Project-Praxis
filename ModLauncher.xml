@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Servers>
-    <ServerGroup Name="Project Praxis" Logo="" Description="Skills come from use, not from spending points - and fade if you stop.">
+    <ServerGroup Name="sphereii-mental" Logo="" Description="Skills come from use, not from spending points - and fade if you stop.">
         <Server Name="Project Praxis" Logo="">
             <Description>
-Project Praxis, with ZZTong's Prefabs, is an overhaul for 7 Days to Die. It changes where your
+Project Praxis, with ZZTong's Prefabs, is an overhaul for 7 Days to Die by sphereii. It changes where your
 character comes from: you no longer spend points on a build, you arrive at one by using the
 skills you want. Praxis means knowledge put into practice - what you can do, rather than what
 you know on paper.
