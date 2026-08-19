@@ -1,0 +1,11 @@
+Key,english
+helpScreensTitle,"Mod Help"
+helpSectionGettingStarted,"Getting Started"
+helpPageAbout,"About"
+helpPageAboutBody,"This is the help screen.\n\nThe column on the left lists every modlet you have installed that has contributed help. Pick one, and its own pages appear as tabs across the top.\n\nIf Getting Started is the only entry, none of your installed modlets have added anything yet."
+helpPageModders,"For Modders"
+helpPageModdersBody,"Adding your own section takes one append and a few localization keys - no code, and no changes to this modlet.\n\nYour section becomes a button in the left column, and each page inside it becomes a tab along the top. You never declare a button at either level; the strips fill themselves in from your pages.\n\nTwo rules. Your modlet folder must sort alphabetically after 0-Help Screens, or the game applies your patch before this window exists and skips your file in full, silently. And never add more pages than there are tab slots.\n\nThe full contract, with a block to copy, is in the Help Screens ReadMe.md."
+helpNavCaption,"Mods"
+helpMenuTitle,"Mod Summary"
+helpMenuAbout,"About"
+helpMenuAboutBody,"This panel describes the mods you have installed, so you know what to expect before starting a game.\n\nThe pack you are running switched this panel on but has not written its description yet, so this placeholder is showing instead. Any tabs beside this one are still worth reading.\n\nThe full help lives in the game itself. Press ESC and choose Mod Help, where every mod gets its own section and as many pages as it needs."

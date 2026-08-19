@@ -1,0 +1,209 @@
+<configs>
+    <!-- Append the LBD logic for Healing Factor to the main Fortitude Manager buff. -->
+    <append xpath="/buffs/buff[@name='buffLBD_FortitudeManager']">
+        <effect_group name="Healing Factor">
+            <!-- Master requirement: Player must be moving. -->
+            <requirements compare_type="or">
+                <requirement name="EntityHasMovementTag" tags="running"/>
+                <requirement name="EntityHasMovementTag" tags="walking"/>
+            </requirements>
+
+            <!-- XP Gain: Tier 1 (Mild Hunger/Thirst: buffStatusHungry01/Thirsty01) - REMOVED AS PER DESIGN -->
+
+            <!-- XP Gain: Tier 2 (Moderate Hunger/Thirst: buffStatusHungry02/Thirsty02) - COMMENTED OUT AS PER DESIGN -->
+            <!--
+            <triggered_effect trigger="onSelfRun" action="LogMessageCVars, SCore" message="LBD DEBUG: Healing Factor - Moderate Hunger/Thirst Bonus XP (+@$lbd_xp_healingfactor_tier2_bonus)">
+                <requirements compare_type="or">
+                    <requirement name="HasBuff" buff="buffStatusHungry02"/>
+                    <requirement name="HasBuff" buff="buffStatusThirsty02"/>
+                </requirements>
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_XPCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfRun" action="ModifyCVar" cvar="$perkhealingfactor_lbd_xp" operation="add" value="@$lbd_xp_healingfactor_tier2_bonus">
+                <requirements compare_type="or">
+                    <requirement name="HasBuff" buff="buffStatusHungry02"/>
+                    <requirement name="HasBuff" buff="buffStatusThirsty02"/>
+                </requirements>
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_XPCoolDown"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfWalk" action="LogMessageCVars, SCore" message="LBD DEBUG: Healing Factor - Moderate Hunger/Thirst Bonus XP (+@$lbd_xp_healingfactor_tier2_bonus)">
+                <requirements compare_type="or">
+                    <requirement name="HasBuff" buff="buffStatusHungry02"/>
+                    <requirement name="HasBuff" buff="buffStatusThirsty02"/>
+                </requirements>
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_XPCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfWalk" action="ModifyCVar" cvar="$perkhealingfactor_lbd_xp" operation="add" value="@$lbd_xp_healingfactor_tier2_bonus">
+                <requirements compare_type="or">
+                    <requirement name="HasBuff" buff="buffStatusHungry02"/>
+                    <requirement name="HasBuff" buff="buffStatusThirsty02"/>
+                </requirements>
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_XPCoolDown"/>
+            </triggered_effect>
+            -->
+
+            <!-- XP Gain: Tier 3 (Severe Hunger/Thirst: buffStatusHungry03/Thirsty03) - HIGH Bonus -->
+            <triggered_effect trigger="onSelfRun" action="LogMessageCVars, SCore" message="LBD DEBUG: Healing Factor - Severe Hunger/Thirst Bonus XP (+@$lbd_xp_healingfactor_tier3_bonus)">
+                <requirements compare_type="or">
+                    <requirement name="HasBuff" buff="buffStatusHungry03"/>
+                    <requirement name="HasBuff" buff="buffStatusThirsty03"/>
+                </requirements>
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_XPCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfRun" action="ModifyCVar" cvar="$perkhealingfactor_lbd_xp" operation="add" value="@$lbd_xp_healingfactor_tier3_bonus">
+                <requirements compare_type="or">
+                    <requirement name="HasBuff" buff="buffStatusHungry03"/>
+                    <requirement name="HasBuff" buff="buffStatusThirsty03"/>
+                </requirements>
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_XPCoolDown"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfWalk" action="LogMessageCVars, SCore" message="LBD DEBUG: Healing Factor - Severe Hunger/Thirst Bonus XP (+@$lbd_xp_healingfactor_tier3_bonus)">
+                <requirements compare_type="or">
+                    <requirement name="HasBuff" buff="buffStatusHungry03"/>
+                    <requirement name="HasBuff" buff="buffStatusThirsty03"/>
+                </requirements>
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_XPCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfWalk" action="ModifyCVar" cvar="$perkhealingfactor_lbd_xp" operation="add" value="@$lbd_xp_healingfactor_tier3_bonus">
+                <requirements compare_type="or">
+                    <requirement name="HasBuff" buff="buffStatusHungry03"/>
+                    <requirement name="HasBuff" buff="buffStatusThirsty03"/>
+                </requirements>
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_XPCoolDown"/>
+            </triggered_effect>
+
+            <!-- Cooldown Application
+
+                 These four carried no hunger or thirst requirement, while the awards above
+                 need buffStatusHungry03 or buffStatusThirsty03. Any run or walk therefore
+                 started the throttle - a day 1 session logged 21 Applying Cooldown lines
+                 with no award behind a single one of them. Awards are ordered ahead of
+                 this block so nothing was actually blocked, but it burned the window: get
+                 severely hungry a moment after the throttle starts and you wait out its
+                 10s before the first award lands. Scoped to match the awards. -->
+            <triggered_effect trigger="onSelfRun" action="LogMessageCVars, SCore" message="LBD DEBUG: Healing Factor - Applying Cooldown">
+                <requirements compare_type="or">
+                    <requirement name="HasBuff" buff="buffStatusHungry03"/>
+                    <requirement name="HasBuff" buff="buffStatusThirsty03"/>
+                </requirements>
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_XPCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfRun" action="AddBuff" buff="buffLBD_perkHealingFactor_XPCoolDown">
+                <requirements compare_type="or">
+                    <requirement name="HasBuff" buff="buffStatusHungry03"/>
+                    <requirement name="HasBuff" buff="buffStatusThirsty03"/>
+                </requirements>
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_XPCoolDown"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfWalk" action="LogMessageCVars, SCore" message="LBD DEBUG: Healing Factor - Applying Cooldown">
+                <requirements compare_type="or">
+                    <requirement name="HasBuff" buff="buffStatusHungry03"/>
+                    <requirement name="HasBuff" buff="buffStatusThirsty03"/>
+                </requirements>
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_XPCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfWalk" action="AddBuff" buff="buffLBD_perkHealingFactor_XPCoolDown">
+                <requirements compare_type="or">
+                    <requirement name="HasBuff" buff="buffStatusHungry03"/>
+                    <requirement name="HasBuff" buff="buffStatusThirsty03"/>
+                </requirements>
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_XPCoolDown"/>
+            </triggered_effect>
+
+            <!-- Level Up Check -->
+            <triggered_effect trigger="onSelfRun" action="LogMessageCVars, SCore" message="LBD DEBUG: Healing Factor - Triggering Level Up Check">
+                <requirement name="CVarCompare" cvar="$perkhealingfactor_lbd_xp" operation="GTE" value="@$perkhealingfactor_lbd_xptonext"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfRun" action="AddBuff" buff="buffLBD_perkHealingFactor_LevelUpCheck">
+                <requirement name="CVarCompare" cvar="$perkhealingfactor_lbd_xp" operation="GTE" value="@$perkhealingfactor_lbd_xptonext"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfWalk" action="LogMessageCVars, SCore" message="LBD DEBUG: Healing Factor - Triggering Level Up Check">
+                <requirement name="CVarCompare" cvar="$perkhealingfactor_lbd_xp" operation="GTE" value="@$perkhealingfactor_lbd_xptonext"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfWalk" action="AddBuff" buff="buffLBD_perkHealingFactor_LevelUpCheck">
+                <requirement name="CVarCompare" cvar="$perkhealingfactor_lbd_xp" operation="GTE" value="@$perkhealingfactor_lbd_xptonext"/>
+            </triggered_effect>
+        </effect_group>
+    </append>
+
+    <!--
+        =====================================================================
+        HEALING ITSELF COUNTS
+        =====================================================================
+
+        Everything above pays for enduring deprivation - moving while starving or
+        dehydrated. That is a reasonable reading of toughening up, but it left the
+        obvious one out: a perk called Healing Factor, whose vanilla effect is faster
+        health regeneration, earned nothing from healing.
+
+        onSelfHealedSelf covers both natural regeneration and patching yourself up. It is
+        deliberately NOT gated on what you are holding. Gating it on "no medical item"
+        would have made it natural regen only, which is closer to the vanilla effect, but
+        it would also mean the moment you actually treat a wound is the one moment this
+        perk ignores. Using a bandage already trains Crafting Medical; both firing on one
+        heal is the same intended overlap as a salvage swing feeding Salvage Operations,
+        Crafting Salvage Tools and Advanced Engineering at once.
+
+        THE COOLDOWN IS THE RATE CONTROL. Health regenerates on a tick, so this trigger
+        fires far more often than the hunger paths, and without a throttle it would be a
+        passive grind of exactly the sort the armour perks avoid. 15 seconds, and only 2
+        XP a time.
+    -->
+    <append xpath="/buffs/buff[@name='buffLBD_FortitudeManager']">
+        <effect_group name="Healing Factor (Healing)">
+
+            <triggered_effect trigger="onSelfHealedSelf" action="LogMessageCVars, SCore"
+                              message="LBD DEBUG: Healing Factor - Attempting Heal XP (+@$lbd_xp_healingfactor_heal)">
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_HealCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfHealedSelf" action="ModifyCVar"
+                              cvar="$perkhealingfactor_lbd_xp" operation="add" value="@$lbd_xp_healingfactor_heal">
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_HealCoolDown"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfHealedSelf" action="AddBuff"
+                              buff="buffLBD_perkHealingFactor_HealCoolDown">
+                <requirement name="NotHasBuff" buff="buffLBD_perkHealingFactor_HealCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfHealedSelf" action="AddBuff"
+                              buff="buffLBD_perkHealingFactor_LevelUpCheck">
+                <requirement name="CVarCompare" cvar="$perkhealingfactor_lbd_xp" operation="GTE"
+                             value="@$perkhealingfactor_lbd_xptonext"/>
+            </triggered_effect>
+
+        </effect_group>
+    </append>
+
+
+    <!-- Define the Level-Up Handler buff for Healing Factor. -->
+    <append xpath="/buffs">
+        <buff name="buffLBD_perkHealingFactor_LevelUpCheck" hidden="true">
+            <stack_type value="ignore"/><duration value="1"/>
+            <effect_group>
+                <requirement name="CanPurchasePerk, SCore" progression_name="perkHealingFactor" />
+                <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Healing Factor - Level Up SUCCESS (perkHealingFactor)">
+                    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                </triggered_effect>
+                <triggered_effect trigger="onSelfBuffStart" action="AddProgressionLevel" progression_name="perkHealingFactor" level="1"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkhealingfactor_lbd_xp" operation="subtract" value="@$perkhealingfactor_lbd_xptonext"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkhealingfactor_lbd_xptonext" operation="multiply" value="@$lbd_xp_curve_multiplier"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ShowToolbeltMessage" message_key="perkHealingFactorLeveledUp"/>
+            </effect_group>
+            <effect_group>
+                <requirement name="!CanPurchasePerk, SCore" progression_name="perkHealingFactor" />
+                <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Healing Factor - Level Up FAILED. Perk is locked by requirements.">
+                    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                </triggered_effect>
+            </effect_group>
+        </buff>
+    </append>
+</configs>

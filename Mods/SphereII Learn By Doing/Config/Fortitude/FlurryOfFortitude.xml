@@ -1,0 +1,69 @@
+<configs>
+    <!-- Append the LBD logic for Flurry of Fortitude to the main Fortitude Manager buff. -->
+    <append xpath="/buffs/buff[@name='buffLBD_FortitudeManager']">
+        <effect_group name="Flurry of Fortitude">
+            <requirement name="HoldingItemHasTags" tags="perkBrawler,perkMachineGunner"/>
+            <requirement name="IsAlive" target="other"/>
+
+            <triggered_effect trigger="onSelfPrimaryActionRayHit" action="ModifyCVar" cvar="$perkflurryoffortitude_lbd_xp" operation="add" value="@$lbd_xp_flurry_bonus">
+                <requirement name="HasBuff" buff="buffLBD_Flurry_ComboWindow_Fortitude"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfSecondaryActionRayHit" action="ModifyCVar" cvar="$perkflurryoffortitude_lbd_xp" operation="add" value="@$lbd_xp_flurry_bonus">
+                <requirement name="HoldingItemHasTags" tags="perkBrawler"/>
+                <requirement name="HasBuff" buff="buffLBD_Flurry_ComboWindow_Fortitude"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfPrimaryActionRayHit" action="AddBuff" buff="buffLBD_Flurry_ComboWindow_Fortitude"/>
+            <triggered_effect trigger="onSelfSecondaryActionRayHit" action="AddBuff" buff="buffLBD_Flurry_ComboWindow_Fortitude">
+                <requirement name="HoldingItemHasTags" tags="perkBrawler"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfPrimaryActionRayHit" action="AddBuff" buff="buffLBD_perkFlurryOfFortitude_LevelUpCheck">
+                <requirement name="CVarCompare" cvar="$perkflurryoffortitude_lbd_xp" operation="GTE" value="@$perkflurryoffortitude_lbd_xptonext"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfSecondaryActionRayHit" action="AddBuff" buff="buffLBD_perkFlurryOfFortitude_LevelUpCheck">
+                <requirement name="HoldingItemHasTags" tags="perkBrawler"/>
+                <requirement name="CVarCompare" cvar="$perkflurryoffortitude_lbd_xp" operation="GTE" value="@$perkflurryoffortitude_lbd_xptonext"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: Flurry of Fortitude Primary - COMBO HIT! Applying Bonus XP (+@$lbd_xp_flurry_bonus)">
+                <requirement name="HasBuff" buff="buffLBD_Flurry_ComboWindow_Fortitude"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfSecondaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: Flurry of Fortitude Secondary (Brawling) - COMBO HIT! Applying Bonus XP (+@$lbd_xp_flurry_bonus)">
+                <requirement name="HoldingItemHasTags" tags="perkBrawler"/>
+                <requirement name="HasBuff" buff="buffLBD_Flurry_ComboWindow_Fortitude"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+        </effect_group>
+    </append>
+
+    <!-- Define the Level-Up Handler and the Combo Window buff. -->
+    <append xpath="/buffs">
+        <!-- The temporary buff that creates the combo window. 'stack_type="replace"' is CRITICAL. -->
+        <buff name="buffLBD_Flurry_ComboWindow_Fortitude" hidden="true">
+            <stack_type value="replace"/>
+            <duration value="2"/>
+        </buff>
+
+        <buff name="buffLBD_perkFlurryOfFortitude_LevelUpCheck" hidden="true">
+            <stack_type value="ignore"/><duration value="1"/>
+            <effect_group>
+                <requirement name="CanPurchasePerk, SCore" progression_name="perkFlurryOfFortitude" />
+                <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Flurry of Fortitude - Level Up SUCCESS (perkFlurryOfFortitude)">
+                    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                </triggered_effect>
+                <triggered_effect trigger="onSelfBuffStart" action="AddProgressionLevel" progression_name="perkFlurryOfFortitude" level="1"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkflurryoffortitude_lbd_xp" operation="subtract" value="@$perkflurryoffortitude_lbd_xptonext"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkflurryoffortitude_lbd_xptonext" operation="multiply" value="@$lbd_xp_curve_multiplier"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ShowToolbeltMessage" message_key="perkFlurryOfFortitudeLeveledUp"/>
+            </effect_group>
+            <effect_group>
+                <requirement name="!CanPurchasePerk, SCore" progression_name="perkFlurryOfFortitude" />
+                <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Flurry of Fortitude - Level Up FAILED. Perk is locked by requirements.">
+                    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                </triggered_effect>
+            </effect_group>
+        </buff>
+    </append>
+</configs>

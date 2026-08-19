@@ -1,0 +1,53 @@
+<configs>
+    <!-- Append the LBD logic for Grand Slam to the main Strength Manager buff. -->
+    <append xpath="/buffs/buff[@name='buffLBD_StrengthManager']">
+        <effect_group name="Grand Slam">
+            <requirement name="HoldingItemHasTags" tags="perkPummelPete,perkSkullCrusher"/>
+            <requirement name="EntityHasMovementTag" tags="running"/>
+
+            <triggered_effect trigger="onSelfSecondaryActionRayHit" action="ModifyCVar" cvar="$perkgrandslam_lbd_xp" operation="add" value="@$lbd_xp_special_base">
+                <requirement name="IsAlive" target="other"/>
+                <requirement name="NotHasBuff" buff="buffLBD_perkGrandSlam_XPCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfSecondaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: Grand Slam - Attempting XP Gain (+@$lbd_xp_special_base)">
+                <requirement name="IsAlive" target="other"/>
+                <requirement name="NotHasBuff" buff="buffLBD_perkGrandSlam_XPCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfSecondaryActionRayHit" action="AddBuff" buff="buffLBD_perkGrandSlam_XPCoolDown">
+                <requirement name="IsAlive" target="other"/>
+                <requirement name="NotHasBuff" buff="buffLBD_perkGrandSlam_XPCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfSecondaryActionRayHit" action="AddBuff" buff="buffLBD_perkGrandSlam_LevelUpCheck">
+                <requirement name="IsAlive" target="other"/>
+                <requirement name="CVarCompare" cvar="$perkgrandslam_lbd_xp" operation="GTE" value="@$perkgrandslam_lbd_xptonext"/>
+            </triggered_effect>
+        </effect_group>
+    </append>
+
+    <!-- Define the Level-Up Handler buff for Grand Slam. -->
+    <append xpath="/buffs">
+        <buff name="buffLBD_perkGrandSlam_LevelUpCheck" hidden="true">
+            <stack_type value="ignore"/><duration value="1"/>
+            <effect_group>
+                <requirement name="CanPurchasePerk, SCore" progression_name="perkGrandSlam" />
+                <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Grand Slam - Level Up SUCCESS (perkGrandSlam)">
+                    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                </triggered_effect>
+                <triggered_effect trigger="onSelfBuffStart" action="AddProgressionLevel" progression_name="perkGrandSlam" level="1"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkgrandslam_lbd_xp" operation="subtract" value="@$perkgrandslam_lbd_xptonext"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkgrandslam_lbd_xptonext" operation="multiply" value="@$lbd_xp_curve_multiplier"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ShowToolbeltMessage" message_key="perkGrandSlamLeveledUp"/>
+            </effect_group>
+            <effect_group>
+                <requirement name="!CanPurchasePerk, SCore" progression_name="perkGrandSlam" />
+                <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Grand Slam - Level Up FAILED. Perk is locked by requirements.">
+                    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                </triggered_effect>
+            </effect_group>
+        </buff>
+    </append>
+</configs>

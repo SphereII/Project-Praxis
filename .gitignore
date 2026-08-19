@@ -1,0 +1,36 @@
+# Project Praxis
+#
+# This is a distribution repo: what is committed here is what a player installs.
+# Nothing that only exists to BUILD a modlet belongs in it. The modlet sources
+# live in https://github.com/SphereII/SphereII.Mods and are mirrored in.
+#
+# This list matches the exclusions in the pack updater script
+# (Mods/UpdateModsFromRepo.bat: /XD obj bin .vs .git /XF *.user *.suo), so a
+# folder skipped on deployment is also a folder that never reaches git.
+#
+# Note on DLLs: a modlet's assembly is committed, but only at the modlet root,
+# because that is the only place 7 Days to Die loads one from. Copies under
+# bin/ and obj/ are build artifacts the game never reads.
+
+# Build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+
+# Visual Studio / Rider local state
+.vs/
+.idea/
+*.user
+*.suo
+*.userprefs
+*.cache
+
+# Packaging
+*.zip
+*.7z
+
+# OS litter
+Thumbs.db
+desktop.ini
+.DS_Store

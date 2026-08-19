@@ -1,0 +1,242 @@
+<configs>
+
+	<!--
+		=========================================================================
+		THE ESC MENU BUTTON
+		=========================================================================
+
+		Appended after btnSandboxSettings so Help sits with the other "settings and
+		information" entries rather than down beside Save and Exit.
+
+		This button is inert on its own. XUiC_InGameMenuWindow.Init looks up exactly ten
+		buttons by name and attaches a C# handler to each; an appended button is not in
+		that list. Harmony/XUiC_InGameMenuWindow_HelpButton.cs supplies the handler, and
+		the name below is the contract between the two - change one, change both.
+
+		insertAfter rather than append: append would put Help below Exit, and the vanilla
+		order deliberately keeps the destructive entries last.
+	-->
+	<insertAfter xpath="/windows/window[@name='ingameMenu']/grid[@name='buttons']/simplebutton[@name='btnSandboxSettings']">
+		<simplebutton name="btnSphereIIHelpScreens" depth="3" width="250" height="46"
+		              caption_key="helpScreensTitle" font_size="34" />
+	</insertAfter>
+
+	<!--
+		=========================================================================
+		THE HELP SCREEN
+		=========================================================================
+
+		Two levels of navigation, both vanilla XUiC_TabSelector:
+
+		    left column (this file)     one button per contributing modlet
+		    top tab strip (per section) that modlet's pages
+
+		Nesting is safe - see the note in templates.xml.
+
+		Geometry and chrome are lifted from vanilla's in-game "sandboxOptions" window, so
+		it sits and behaves like a first-party screen. The window's own controller,
+		XUiC_HelpScreens, exists solely to wire the Close button.
+
+		[ CHILD NAMES THAT MUST NOT CHANGE ]
+		XUiC_TabSelector finds its parts by the dotted path in [XuiBindComponent]:
+		  tabsHeader    walked into, then searched for TabSelectorButton controllers and
+		                for the layout grid
+		  tabsContents  walked into, then searched for TabSelectorTab controllers
+		Both names repeat at each level - the outer nav has a pair, and so does every
+		section. That is fine: each selector's search starts at itself and the outer one
+		stops as soon as it matches a section.
+
+		"border" and "backgroundMainTabs" are two more names XUiC_TabSelector looks for -
+		optional sprites it re-anchors, found by Single lookups that recurse
+		first-match-wins. A stray "border" is unavoidable and harmless: every simplebutton
+		contains one, so the selector always binds to some button's. Both of its uses are
+		gated on tabHeaderBackground being non-null, so the one that actually matters is
+		"backgroundMainTabs" - do not define that, and the border binding is inert.
+
+		[ HOW BUTTONS APPEAR ]
+		By INDEX, at both levels. XUiC_TabSelector.Init pairs Tabs[i] with tabButtons[i],
+		and each button takes its caption from its partner via {tab_name_localized}.
+		Surplus buttons hide themselves (updateTabVisibility: i >= Tabs.Length ->
+		IsVisible = false). Both grids use repeat_content="true", so one declaration
+		yields rows*cols anonymous buttons and a contributor never declares a button at
+		either level.
+
+		[ CAPACITY ]
+		Twenty sections (rows="20" on the nav grid), four pages per section.
+
+		The nav column scrolls, so its limit is the rows attribute alone - height stopped
+		mattering once the grid moved inside a scrollview. The page strip does NOT scroll,
+		so its cols must keep fitting across the 964px section: four 240px tabs.
+
+		Raise either by changing rows/cols and the matching cell size, from this file or
+		from a contributor's own file:
+
+		    <set xpath="/windows/window[@name='helpScreens']//rect[@name='nav']/rect[@name='tabsHeader']//grid[@name='tabButtons']/@rows">30</set>
+
+		Never let sections or pages outnumber their buttons: the surplus gets a null
+		TabButton, and XUiC_TabSelectorTab.TabSelected dereferences it unguarded. Surplus
+		BUTTONS are free - they hide themselves, and because they are always the trailing
+		ones, hiding them leaves no gap in the column.
+
+		[ GAMEPAD ]
+		The outer nav uses use_page_buttons="true" (Page Up/Down) and sections leave it at
+		the default false (Window Paging Left/Right). This is deliberate. Both levels are
+		open at once and XUiC_TabSelector.Update is gated only on the view being visible,
+		so sharing the binding would step the nav and the page strip together.
+
+		[ WHY A DEFAULT SECTION SHIPS ]
+		XUiC_TabSelector logs an error and bails out entirely on zero tabs, so both the
+		nav and every section need at least one child. The Getting Started section below
+		is that floor, and doubles as the worked example a contributor copies.
+	-->
+	<append xpath="/windows">
+
+		<window name="helpScreens" anchor="center" pos="-630,400" width="1260" height="800"
+		        cursor_area="true" pause_game="true"
+		        controller="HelpScreens, SphereIIHelpScreens">
+
+			<rect name="header" height="43" depth="1">
+				<headerbg />
+				<label style="header.name" pos="6,-6" width="550" text_key="helpScreensTitle" />
+			</rect>
+
+			<rect name="content" pos="0,-46" height="${parentinnerheight-46}" depth="1" padding="20">
+				<boxbg />
+
+				<rect name="nav" depth="2" width="1220" height="655" controller="TabSelector"
+				      use_page_buttons="true"
+				      select_tab_contents_on_open="false" select_tab_contents_on_change="false">
+
+					<!--
+						Left column of modlet buttons, scrolling.
+
+						Only 13 buttons fit in the 655px column at 48px each, and XUi rects do
+						not clip, so beyond that the surplus used to draw over the Close button
+						and off the panel. The grid now sits inside a scrollview, so the column
+						is bounded by the grid's rows attribute rather than by its height.
+
+						The scroll rig is the same one helpscreen_page uses, and the same one
+						vanilla's sandboxOptions window uses: a plain rect carrying on_scroll,
+						holding a defaultscrollbar and a scrollview as siblings.
+						XUiV_ScrollView.InitView finds its bar with
+						Parent.TryGetChildView<XUiV_ScrollBar>(""), so the two must share a
+						parent - hence navScrollArea rather than hanging the bar off tabsHeader.
+
+						"tabsHeader" stays the name of the outer rect because XUiC_TabSelector
+						binds through it. Nesting the buttons deeper is safe: that lookup is an
+						array lookup, which recurses until it matches, so the TabSelectorButtons
+						are still found inside the scrollview.
+
+						CHROME: the boxbg/boxcaption pair is vanilla's titled sub-panel idiom -
+						border only, no fill, inset 1px, with a 14px gap along the top for the
+						caption to sit in. It appears 20 times across the shipped in-game
+						windows, always in exactly this form.
+
+						Widths: navScrollArea 240, defaultscrollbar takes the right 16
+						(it positions itself at ${parentinnerwidth-16}), leaving 220 for the
+						scrollview and 216 for the button inside it.
+
+						Vertically the scroll area starts at -24 and the grid inside it is inset
+						a further 10 (see below), so the first button still lands at -34, clear
+						of the caption at roughly -1 to -31. The 10px the grid gives up is the
+						clip softness band, which is empty at rest - putting it above the caption
+						line rather than below keeps the button where it looks right without
+						reintroducing the fade.
+					-->
+					<rect name="tabsHeader" pos="0,0" width="250" height="655" depth="0">
+						<boxbg borderleft="1" borderright="1" bordertop="14" borderbottom="1" backsprite="" />
+						<boxcaption text_key="helpNavCaption" />
+
+						<rect name="navScrollArea" pos="5,-24" width="240" height="616" depth="1"
+						      on_scroll="true" gamepad_selectable="true" snap="false" use_selection_box="true">
+
+							<defaultscrollbar />
+
+							<!--
+								The grid is inset by the clipping softness, not parked at 0,0.
+
+								clippingsoftness maps to NGUI's panel.clipSoftness, which fades
+								anything within that many pixels of the clip edge - by distance,
+								not by scroll position. Content flush against the top of the
+								viewport is therefore faded permanently, which read as the first
+								button being blurry along its top edge on open.
+
+								Starting the grid 10px down puts the first button clear of the
+								band, so it is crisp at rest, while content that scrolls up past
+								the edge still fades out the way it should.
+							-->
+							<scrollview pos="0,0" width="220" clippingsoftness="0,10">
+								<grid name="tabButtons" pos="0,-10" depth="2" rows="20" cols="1"
+								      cell_width="220" cell_height="48" repeat_content="true"
+								      arrangement="vertical">
+									<helpscreen_navbutton />
+								</grid>
+							</scrollview>
+						</rect>
+					</rect>
+
+					<!--
+						One section per contributing modlet. A contributor appends a sibling of
+						the block below with:
+
+						  <append xpath="/windows/window[@name='helpScreens']//rect[@name='nav']/rect[@name='tabsContents']">
+
+						Note the xpath is anchored on rect[@name='nav'] - "tabsContents" alone
+						also matches the one inside every section.
+
+						CHROME: both sprites below live here rather than inside each section, so
+						every contributor gets the same framing without repeating it - and so a
+						section written before this existed still looks right. boxbg fills and
+						frames the whole right panel; pageFrame rings the page area beneath the
+						tab strip, which starts at y -40 in every section.
+					-->
+					<rect name="tabsContents" depth="2" pos="256,0" width="964" height="655">
+
+						<boxbg />
+
+						<sprite depth="9" name="pageFrame" pos="0,-38" width="964" height="617"
+						        sprite="menu_empty2px" type="sliced" fillcenter="false" color="[black]" />
+
+						<rect name="sectionGettingStarted" controller="TabSelectorTab" tab_key="helpSectionGettingStarted">
+							<rect name="tabs" width="964" height="655" controller="TabSelector"
+							      select_tab_contents_on_open="false" select_tab_contents_on_change="false">
+
+								<rect name="tabsHeader" height="38" depth="0">
+									<grid name="tabButtons" pos="3,-2" depth="2" rows="1" cols="4"
+									      cell_width="240" cell_height="36" repeat_content="true"
+									      arrangement="horizontal">
+										<helpscreen_pagebutton />
+									</grid>
+								</rect>
+
+								<rect name="tabsContents" depth="2" pos="0,-40" width="964" height="615">
+									<sprite depth="0" name="pageBackground" sprite="menu_empty3px"
+									        color="[mediumGrey]" type="sliced" fillcenter="true" />
+
+									<helpscreen_page tab_key="helpPageAbout"   text_key="helpPageAboutBody" />
+									<helpscreen_page tab_key="helpPageModders" text_key="helpPageModdersBody" />
+								</rect>
+							</rect>
+						</rect>
+
+					</rect>
+				</rect>
+
+				<!--
+					Close button. Bottom right of the 1220x714 padded content area, below the
+					nav: 1220-200 across, 714-46 down.
+
+					Deliberately a sibling of the nav rect, not a child. It belongs to the
+					window as a whole and must stay put and clickable whichever section and
+					page are showing. XUiC_HelpScreens.Init finds it by name and hooks
+					OnPressed; ESC also closes the window, but returns straight to the game
+					rather than to the pause menu.
+				-->
+				<simplebutton name="btnClose" depth="3" pos="1020,-668" width="200" height="46"
+				              font_size="34" caption_key="xuiClose" />
+			</rect>
+		</window>
+
+	</append>
+
+</configs>

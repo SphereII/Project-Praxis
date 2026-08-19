@@ -1,0 +1,40 @@
+<configs>
+
+	<!--
+		=========================================================================
+		THE MAIN MENU PANEL IS NOT REGISTERED HERE - AND THAT IS THE POINT
+		=========================================================================
+
+		XUi_Menu/windows.xml defines the mainMenuHelpScreens window, but nothing in this
+		modlet adds it to a window_group, so nothing ever opens it and it does not appear.
+		Whoever wants the panel registers it, from their own XUi_Menu/xui.xml:
+
+		    <append xpath="/xui/window_group[@name='mainMenu']">
+		        <window name="mainMenuHelpScreens" />
+		    </append>
+
+		wrapped in <conditional><if cond="mod_loaded('sphereii_help_screens')">.
+
+		[ WHY NOT visible="false" ON THE WINDOW ]
+		Because it does not work, and it is worth writing down so nobody tries it again.
+		XUiV_Window.OnOpen sets base.IsVisible = true unconditionally, every time its
+		group opens:
+
+		    public override void OnOpen()
+		    {
+		        base.OnOpen();
+		        base.IsVisible = true;
+		        ...
+
+		XUiWindowGroup.Init does set each of its windows invisible up front, which is what
+		makes the attribute look like it might survive - but the main menu group opens
+		immediately, OnOpen runs, and the XML value is discarded. A window in an open
+		group is a visible window. The only reliable way to keep one off the screen with
+		no C# is to keep it out of the group.
+
+		Group membership is therefore the on switch, and it is a better one than a
+		visibility flag anyway: an unregistered window costs nothing at runtime, where a
+		hidden one is still built, still parsed, and still has its controllers running.
+	-->
+
+</configs>

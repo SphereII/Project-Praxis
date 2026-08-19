@@ -1,0 +1,136 @@
+<configs>
+    <append xpath="/buffs/buff[@name='buffStatusCheck01']">
+        <effect_group name="Learn By Doing">
+            <!-- Only init is there it's not set -->
+            <triggered_effect trigger="onSelfEnteredGame" action="AddBuff" buff="ProgressionLearnByDoing_Init">
+                <requirement name="CVarCompare" cvar="$lbd_xp_melee_base" operation="LTE" value="0"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfEnteredGame" action="LogMessageCVars, SCore" message="Learn By Doing Active"/>
+        </effect_group>
+    </append>
+    <append xpath="/buffs">
+        <!-- 1. THE GLOBAL INITIALIZER -->
+        <buff name="ProgressionLearnByDoing_Init" hidden="true">
+            <stack_type value="ignore"/>
+            <duration value="1"/>
+            <!-- Included files below will add the respective settings for each perk tree -->
+            <effect_group name="Global LBD Settings">
+
+                <!-- Debug logging switch. Every LBD DEBUG line is gated on this.
+                     Turn on in game with  setcvar $lbd_debug 1  and off with
+                     setcvar $lbd_debug 0  (SCore treats 0 as a remove, and an unset
+                     cvar reads as 0, so that is a genuine off).
+
+                     This used to be gated on HasBuff god. The god buff carries
+                     PhysicalDamageResist and ElementalDamageResist +200 and
+                     CarryCapacity base_set 45, so enabling the log also made the
+                     player invulnerable - and perkLightArmor, perkHeavyArmor,
+                     perkHardTarget and perkPainTolerance earn XP only from taking
+                     damage, so they could never be watched while being exercised.
+                     A plain cvar keeps observation separate from gameplay. -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_debug" operation="set" value="0"/>
+
+                <!-- New: Global XP Gain Multipliers / Base Values -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_melee_base" operation="set" value="1"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_melee_power_base" operation="set" value="5"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_ranged_base" operation="set" value="1"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_harvest_base" operation="set" value="1"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_special_base" operation="set" value="5"/>
+                <!-- One-off award for finishing a salvage teardown, for PERKS rather than
+                     crafting skills. The 5 XP per swing those groups pay is invisible against a
+                     1200 threshold - a session of stripping cars moved Advanced Engineering 1.2%
+                     of a level - so the teardown is what actually makes the path worth having.
+
+                     75 was the first attempt and overshot badly. Measured over a 6.3 minute
+                     salvage run: Advanced Engineering earned 1619 XP an hour and Grease Monkey
+                     1000, against 457 for SALVAGE OPERATIONS - the perk whose actual job is
+                     salvaging - off the very same swings. The teardown was 88% of Advanced
+                     Engineering's total. A bonus for knowing what you are taking apart should
+                     not out-earn the perk for taking things apart.
+
+                     At 25 the same run gives Advanced Engineering 667/hr and Grease Monkey
+                     524/hr, both just above Salvage Operations rather than several times it,
+                     which is the intended ordering.
+
+                     Whoever adds another teardown path must give it its own cooldown, and pick
+                     the duration from the block: single stage blocks like workstations want ~1
+                     second, but a vehicle passes through Damage0 -> Damage1 -> Damage2 on its
+                     way out, each firing onSelfDestroyedBlock, so those want ~15 or the award
+                     pays three times per car. -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_salvage_teardown" operation="set" value="25"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_attribute_synergy_base" operation="set" value="1"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_flurry_bonus" operation="set" value="5"/>
+
+                <!-- Global XP Curve Multiplier, for perks and attributes. Crafting skills use
+                     $lbd_xp_crafting_curve_multiplier instead (CraftingSkills/Init.xml).
+
+                     Lowered from 1.2 to 1.1 after a play session showed the tail was effectively
+                     unreachable. The multiplier compounds, so it dominates the cost of the upper
+                     levels: at 1.2 a 1200 base costs 31,150 XP cumulative to reach level 10, at
+                     1.1 it costs 19,124 - a 39% cut that barely touches the first few levels and
+                     roughly halves the last few.
+
+                     Measured against that same session, where the hardest-fed skill earned about
+                     870 XP an hour: level 10 went from 36 hours of that one activity to 22, and a
+                     mid-rate perk like Pack Mule from 130 hours to 80. -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_curve_multiplier" operation="set" value="1.1"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_damage_taken_base" operation="set" value="3"/>
+
+                <!-- Pain Tolerance -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_stun_bonus" operation="set" value="5"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_concussion_bonus" operation="set" value="10"/>
+
+                <!-- Healing.
+
+                     There is no tier1 bonus. Healing Factor's hunger paths only ever read tier2
+                     and tier3 - a $lbd_xp_healingfactor_tier1_bonus was defined here for a
+                     tier 1 path that was never written, sat unreferenced, and has been removed
+                     rather than left to look like something was broken. -->
+                <!-- Award for actually healing. Small on purpose: health regenerates on a tick,
+                     so onSelfHealedSelf fires far more often than the hunger paths below, and the
+                     15 second cooldown on buffLBD_perkHealingFactor_HealCoolDown is what really
+                     sets the rate. -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_healingfactor_heal" operation="set" value="2"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_healingfactor_tier2_bonus" operation="set" value="5"/>
+                <!-- Moderate: +5 -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_healingfactor_tier3_bonus" operation="set" value="10"/>
+                <!-- Severe: +10 -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_slowmetabolism_bonus" operation="set" value="2"/>
+                <!-- Mild: +2 -->
+                <!-- New: Synergy XP Multipliers (Pre-calculated) -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_synergy_parkour_bonus" operation="set" value="4"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_synergy_hiddenstrike_bonus" operation="set" value="4"/>
+                <!-- Daring Adventure. Read by Daring Adventurer and Charismatic Nature only.
+                     Was 200/100: a tier 5 quest paid 700 of the 2000 Daring needs for level 1,
+                     and 200 of Charismatic's 1400, so both levelled every few quests. -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_quest_base" operation="set" value="40"/>
+                <!-- You might also want a multiplier per tier, e.g., $lbd_xp_quest_tier_multiplier -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_quest_tier_multiplier" operation="set" value="20"/>
+                <!-- Bonus XP per tier -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_synergy_quest_bonus" operation="set" value="6"/>
+                <!-- Long crafting bonus xp -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_greasemonkey_longcraft_bonus" operation="set" value="30"/>
+                <!-- Long crafting bonus for food -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_masterchef_longcraft_bonus" operation="set" value="20"/>
+            </effect_group>
+            <effect_group name="Master Level">
+                <!-- NEW: LBD Level Trackers for Mastery Perks -->
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkperceptionmastery_lbd_level" operation="set" value="0"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkstrengthmastery_lbd_level" operation="set" value="0"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkfortitudemastery_lbd_level" operation="set" value="0"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkagilitymastery_lbd_level" operation="set" value="0"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkintellectmastery_lbd_level" operation="set" value="0"/>
+            </effect_group>
+        </buff>
+    </append>
+    <!-- Include the manager file for each attribute -->
+    <include filename="Perception/main.xml"/>
+    <include filename="Strength/main.xml"/>
+    <include filename="Fortitude/main.xml"/>
+    <include filename="Agility/main.xml"/>
+    <include filename="Intellect/main.xml"/>
+    <include filename="General/main.xml"/>
+    <include filename="CraftingSkills/main.xml"/>
+    <!-- TEMPORARY: block name diagnostic. Remove with the file. -->
+    <include filename="_BlockDiagnostic.xml"/>
+</configs>

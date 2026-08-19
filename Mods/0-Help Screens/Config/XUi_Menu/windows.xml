@@ -1,0 +1,256 @@
+<configs>
+
+	<!--
+		=========================================================================
+		THE MAIN MENU MOD SUMMARY PANEL
+		=========================================================================
+
+		The front-end counterpart to the in-game help screen: a tabbed text box on the
+		main menu, one tab per contributed page. Same contract as the in-game screen - a
+		contributor appends pages with one XPath, writes no C#, and never declares a tab
+		button.
+
+		[ WHAT IT IS FOR ]
+		Summaries, not reference. This is the panel an overhaul uses to say what it is
+		before anyone starts a game: what it changes, what to expect, anything worth
+		deciding on up front. The in-game screen (ESC -> Mod Help) is where the detail
+		lives, for someone already playing.
+
+		[ HIDDEN UNTIL SOMETHING TURNS IT ON ]
+		An empty box on the main menu helps nobody, and a lone About tab explaining that
+		nothing has been contributed is worse than no box at all - so this window is
+		defined here but registered nowhere. It belongs to no window_group, so nothing
+		opens it and it does not exist as far as the menu is concerned. An overhaul opts
+		in from its own XUi_Menu/xui.xml:
+
+		    <append xpath="/xui/window_group[@name='mainMenu']">
+		        <window name="mainMenuHelpScreens" />
+		    </append>
+
+		NOT a visible="false" attribute, which was tried and does not work:
+		XUiV_Window.OnOpen sets base.IsVisible = true unconditionally whenever its group
+		opens, so the XML value is discarded the moment the menu comes up. See the long
+		note in xui.xml. Group membership is the switch.
+
+		Enabling it is a statement of ownership. The panel holds four tabs and one is
+		About, so whoever switches it on is taking responsibility for the other three -
+		this is a front page for a pack, not a noticeboard every modlet pins to. A modlet
+		can still contribute a tab without registering the window, and it simply stays
+		unseen until some overhaul in the same install registers it.
+
+		It is also deliberately flatter than the in-game screen. That one has two levels,
+		a modlet column and a page strip, because it has 1260px to spend. This panel has
+		450, so there is one level: every page is a top level tab, and contributors keep
+		their captions short.
+
+		[ PLACEMENT ]
+		The menu's virtual canvas is 1920 wide and a window's origin is its top-left
+		corner at pos, so anchor="Top" pos="420,-320" puts the left edge at x=420 - the
+		same column vanilla's news boxes use (mainMenuNews sits at 870 with its "game"
+		rect offset -450, giving 420..870). It ends at -880, level with the bottom of the
+		button grid opposite (grid top -450 plus seven 60px rows).
+
+		[ STRUCTURE ]
+		headerbox, then a content rect carrying boxbg. That is the main menu's own panel
+		shape, not an invention: vanilla's XUi_Menu uses headerbox 17 times and always in
+		this pairing, with the content rect offset one pixel into the header
+
+		    <headerbox height="40" text_key="..." />
+		    <rect name="content" pos="0,-39" height="${parentinnerheight-40}" padding="10">
+		        <boxbg ... />
+
+		which is where the -39 and the -40 below come from. It is the same skeleton the
+		0-SCore windows use in game, with headerbox standing in for the headerbg plus
+		header.name label pair - those appear twice and once respectively in XUi_Menu, so
+		using them here would read as an in-game dialog dropped onto the menu.
+
+		headerbox brings the menu's red accent with it (border and text both 228,18,21),
+		which is why the panel needs no separate title rule of its own.
+
+		[ CHILD NAMES THAT MUST NOT CHANGE ]
+		From the [XuiBindComponent] paths on XUiC_TabSelector - get them wrong and the
+		selector logs an error and does nothing:
+		  tabsHeader    searched recursively for TabSelectorButton controllers, and
+		                non-recursively for the XUiV_Table that lays them out
+		  tabsContents  searched recursively for TabSelectorTab controllers
+		"border" and "backgroundMainTabs" are two more names it looks for - optional
+		sprites it re-anchors, found by Single lookups that recurse first-match-wins. This
+		panel defines neither. boxbg names its internals sprBorder and sprBackground, so
+		the hazard is avoided by construction rather than by picking odd names.
+
+		[ HOW BUTTONS APPEAR ]
+		By INDEX. XUiC_TabSelector.Init pairs Tabs[i] with tabButtons[i], and each button
+		takes its caption from its partner via {tab_name_localized}. Surplus buttons hide
+		themselves (updateTabVisibility: i >= Tabs.Length -> IsVisible = false), so the
+		eight declared below serve however many pages exist.
+
+		Never let pages outnumber buttons: the surplus gets a null TabButton, which
+		XUiC_TabSelectorTab.TabSelected dereferences unguarded.
+
+		[ CAPACITY ]
+		Four tabs, from cols="4" on the button grid. Unlike the in-game nav column this
+		strip does not scroll, and unlike the table it replaced it does not pack buttons
+		at their natural width - every cell is a fixed 107px. A caption too long for one
+		shrinks to fit rather than overrunning its neighbour, so a long mod name costs
+		legibility rather than layout.
+
+		Prefer the modlet's own name over a topic: one summary tab per modlet is the
+		intent, and the About tab holds one of the four.
+
+		Raising it is a one-liner from a contributor's own file, with cell_width brought
+		down to match:
+
+		    <set xpath="/windows/window[@name='mainMenuHelpScreens']//grid[@name='tabButtons']/@cols">5</set>
+		    <set xpath="/windows/window[@name='mainMenuHelpScreens']//grid[@name='tabButtons']/@cell_width">86</set>
+
+		Past five or so the cells stop being wide enough to read. There is no button to
+		append alongside it - see the note on the grid itself.
+
+		[ WHY A DEFAULT PAGE SHIPS, AND WHAT TO DO WITH IT ]
+		XUiC_TabSelector logs an error and bails out entirely on zero tabs, so the panel
+		needs at least one child of its own. The About page below is that floor, and
+		doubles as the worked example a contributor copies.
+
+		Tab 0 is selected at Init, so About is what opens - which makes it the right home
+		for the general description of the pack rather than a note about the panel. The
+		body shipped here is a placeholder saying as much, and whoever enables the panel
+		is expected to replace it:
+
+		    <set xpath="/windows/window[@name='mainMenuHelpScreens']//helpmenu_page[@tab_key='helpMenuAbout']/@text_key">yourPackOverviewBody</set>
+
+		That patch reaches a template INSTANTIATION, not a template's internals - the
+		instantiation is an ordinary node carrying ordinary attributes right up until
+		templates expand, and XPath patching runs before that. The same timing is why
+		nothing can append into a template's insides.
+
+		Leaving About generic and spending a separate tab on the overview also works, but
+		costs one of the four cells and puts the pack's own words one click away from
+		where the panel opens.
+
+		select_tab_contents_on_open / select_tab_contents_on_change are off because the
+		tab bodies hold no selectable controls for gamepad focus to land on. Note the
+		second name: vanilla's own sandboxOptions and serverBrowser windows write it as
+		"select_contents_on_change", which is not the registered attribute name
+		(XUiC_TabSelector.attributeSelectTabContentsOnChange) and so does nothing. The
+		spelling below is the one the code actually reads.
+
+		Gamepad: with use_page_buttons left at its default false, XUiC_TabSelector.Update
+		cycles tabs on GUI Window Paging Left/Right while the main menu group is open.
+		Nothing else in the main menu binds those, so there is no conflict. Setting it
+		true moves the binding to Page Up/Down and makes the window request gamepad
+		callout icons, which would put extra chrome on the main menu - hence off.
+
+		[ HISTORY ]
+		This panel was mainMenuLearnByDoing, owned by SphereII Learn By Doing, with its
+		three tabs written as literal XML and its own lbd_tab_button template. It now
+		lives here so that any modlet can add a page, and Learn By Doing contributes to
+		it the same way every other modlet does.
+	-->
+	<append xpath="/windows">
+
+		<window name="mainMenuHelpScreens" anchor="Top" pos="420,-320" width="450" height="560" depth="1">
+
+			<!--
+				Title bar. helpMenuTitle is its own key rather than the helpScreensTitle the
+				in-game screen uses, because that one also captions the ESC menu button -
+				the two surfaces are named separately on purpose.
+
+				height 40 and font_size 26 are the scaled-down settings: headerbox defaults
+				to 50 and font_size 38, which are sized for the full width menu pages, not a
+				450px side panel. Vanilla uses height="40" the same way for its nested
+				panels.
+			-->
+			<headerbox height="40" font_size="26" text_key="helpMenuTitle" />
+
+			<!--
+				CHROME. 16,16,16 with a 2px [darkGrey] border is the menu's content panel
+				styling - 21 and 23 uses respectively in XUi_Menu, the most common of each,
+				and always on exactly this <rect name="content"> block.
+
+				It is deliberately NOT pure black. [black] is 0,0,0,255 and belongs to the
+				news boxes, which are image backed and want a hard backing behind a photo;
+				borrowing from them made this panel read as a darker hole than everything
+				around it. 16,16,16 is the near-black the menu uses for panels you read text
+				in. The border is [darkGrey] (64,64,64) rather than [mediumGrey] (96,96,96)
+				for the same reason - the two go together, and moving one without the other
+				leaves a pairing vanilla never uses.
+
+				boxbg self sizes from outerwidth/outerheight with ignoreparentpadding, so
+				the frame follows this rect rather than being restated beside it.
+			-->
+			<rect name="content" pos="0,-39" height="${parentinnerheight-40}" depth="1" padding="10">
+
+				<boxbg backcolor="16,16,16,255" bordersprite="menu_empty2px" bordercolor="[darkGrey]" />
+
+				<rect name="tabs" depth="4" width="${parentinnerwidth}" height="${parentinnerheight}"
+				      controller="TabSelector"
+				      select_tab_contents_on_open="false" select_tab_contents_on_change="false">
+
+					<!--
+						Tab strip. One declaration, exactly as both in-game grids do it: the
+						grid carries repeat_content and stamps out rows*cols copies, so
+						neither this file nor a contributor ever lists a button.
+
+						This is why it is a grid and not the XUiV_Table it used to be.
+						repeat_content is declared on XUiView, so any view accepts the
+						attribute - but the count comes from XUiView.RepeatCount, which is
+						virtual and resets to 1, and only XUiV_Grid overrides it (Columns *
+						Rows). A table carrying repeat_content therefore yields a single
+						button, which is why the strip previously had eight listed by hand.
+
+						The trade is fixed cells instead of text-width packing: 4 x 107
+						across the 430 content width, 2px spare. A caption longer than the
+						cell shrinks to fit rather than overrunning its neighbour - see the
+						template. Keep captions short anyway; a mod's own name is the
+						intent, and a long one will shrink noticeably.
+
+						Capacity is now the cols count and nothing else, so raising it is a
+						genuine one-liner from a contributor's own file, with no matching
+						button to append:
+
+						    <set xpath="/windows/window[@name='mainMenuHelpScreens']//grid[@name='tabButtons']/@cols">5</set>
+
+						though cell_width has to come down to match, and past five or so the
+						cells stop being wide enough to read.
+					-->
+					<rect name="tabsHeader" pos="0,0" width="${parentinnerwidth}" height="34" depth="5">
+						<grid name="tabButtons" pos="0,0" depth="5" rows="1" cols="4"
+						      cell_width="107" cell_height="32" repeat_content="true"
+						      arrangement="horizontal">
+							<helpmenu_tabbutton />
+						</grid>
+					</rect>
+
+					<sprite depth="5" name="headerRule" pos="0,-38" width="${parentinnerwidth}" height="2"
+					        sprite="menu_empty2px" type="sliced" color="[red]" globalopacitymod="0" />
+
+					<!--
+						One page per contributor. A contributor appends a sibling of the page
+						below with:
+
+						  <append xpath="/windows/window[@name='mainMenuHelpScreens']//rect[@name='tabsContents']">
+						      <helpmenu_page tab_key="..." text_key="..." />
+						  </append>
+
+						wrapped in <conditional><if cond="mod_loaded('sphereii_help_screens')">,
+						because this window only exists when this modlet is installed.
+
+						SIZING: this rect starts below the rule at -46 and runs to the bottom
+						of the padded content area, so 430 across and 500-46 down. helpmenu_page
+						declares those two numbers literally, the way helpscreen_page does in
+						XUi_InGame, so that a contributor never reasons about sizing - which
+						means the template's defaults and this rect have to be changed together.
+					-->
+					<rect name="tabsContents" pos="0,-46" width="${parentinnerwidth}"
+					      height="${parentinnerheight-46}" depth="5">
+
+						<helpmenu_page tab_key="helpMenuAbout" text_key="helpMenuAboutBody" />
+
+					</rect>
+				</rect>
+			</rect>
+		</window>
+
+	</append>
+
+</configs>

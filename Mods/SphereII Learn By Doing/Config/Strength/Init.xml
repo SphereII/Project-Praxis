@@ -1,0 +1,73 @@
+<configs>
+    <!-- Append the initializers for the Strength LBD system to the global Init buff. -->
+    <append xpath="/buffs/buff[@name='ProgressionLearnByDoing_Init']">
+        <effect_group name="Strength Initializers">
+            
+            <!-- Apply the permanent Strength Manager Buff to the player -->
+            <triggered_effect trigger="onSelfBuffRemove" action="AddBuff" buff="buffLBD_StrengthManager"/>
+
+            <!-- Initializers for Strength CVars -->
+
+            <!-- attStrength -->
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$attstrength_lbd_xp" operation="set" value="0"/>
+            <!-- Attribute first threshold. Was 5000, which at the ~10 XP/min a real session
+                 produces meant 8 hours for level 1 and about 209 hours to reach 10 -
+                 nearly seven times what maxing a five level perk costs, despite
+                 attributes accruing faster from their seven to nine award paths. At
+                 1200, the same number every perk uses, level 1 lands in under two
+                 hours and the full ten levels total 31,150, still three and a half
+                 times a perk's whole ladder. The 1.2 curve is global and unchanged. -->
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$attstrength_lbd_xptonext" operation="set" value="1200"/>
+            <!-- Mining payout for attStrength: destroying an ore or wood block with a
+                 mining tool. Read only by Strength.xml, which was referencing it without
+                 anything ever defining it - an unset cvar reads as 0, so that award
+                 granted nothing. Set to the same 5 as a power attack, since finishing a
+                 block is the deliberate, slower action of the two. -->
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_strength_block_bonus" operation="set" value="5"/>
+
+            <!-- perkBoomstick -->
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkboomstick_lbd_xp" operation="set" value="0"/>
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkboomstick_lbd_xptonext" operation="set" value="1200"/>
+
+            <!-- perkPummelPete -->
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkpummelpete_lbd_xp" operation="set" value="0"/>
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkpummelpete_lbd_xptonext" operation="set" value="1200"/>
+
+            <!-- perkSkullCrusher -->
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkskullcrusher_lbd_xp" operation="set" value="0"/>
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkskullcrusher_lbd_xptonext" operation="set" value="1200"/>
+
+            <!-- perkGrandSlam -->
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkgrandslam_lbd_xp" operation="set" value="0"/>
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkgrandslam_lbd_xptonext" operation="set" value="1200"/>
+
+            <!-- perkFlurryOfBlows -->
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkflurryofblows_lbd_xp" operation="set" value="0"/>
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkflurryofblows_lbd_xptonext" operation="set" value="1200"/>
+
+            <!-- perkMiner69r -->
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkminer69r_lbd_xp" operation="set" value="0"/>
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkminer69r_lbd_xptonext" operation="set" value="1200"/>
+
+            <!-- perkMotherLode -->
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkmotherlode_lbd_xp" operation="set" value="0"/>
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkmotherlode_lbd_xptonext" operation="set" value="1200"/>
+
+            <!-- perkJunkMiner -->
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkjunkminer_lbd_xp" operation="set" value="0"/>
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkjunkminer_lbd_xptonext" operation="set" value="1200"/>
+
+            <!-- perkPackMule -->
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkpackmule_lbd_xp" operation="set" value="0"/>
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkpackmule_lbd_xptonext" operation="set" value="1200"/>
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_packmule_tier1" operation="set" value="1"/>
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_packmule_tier2" operation="set" value="3"/>
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_packmule_tier3" operation="set" value="5"/>
+            
+            <!-- perkStrengthMastery -->
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkstrengthmastery_lbd_xp" operation="set" value="0"/>
+            <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkstrengthmastery_lbd_xptonext" operation="set" value="3000"/>
+
+        </effect_group>
+    </append>
+</configs>

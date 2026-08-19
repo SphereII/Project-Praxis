@@ -1,0 +1,20 @@
+<configs>
+
+	<!--
+		Register the help screen as its own window group.
+
+		A <window> only ever renders as part of a window_group, and a group is what
+		GUIWindowManager.Open(id) takes - so the group name "helpScreens" is the public
+		handle anything uses to open this screen.
+
+		No controller: nothing in the window binds to runtime state that a controller
+		would have to supply. The tab machinery is vanilla XUiC_TabSelector, declared
+		inside the window itself.
+	-->
+	<append xpath="/xui">
+		<window_group name="helpScreens">
+			<window name="helpScreens" />
+		</window_group>
+	</append>
+
+</configs>

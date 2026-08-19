@@ -1,0 +1,63 @@
+<configs>
+	<append xpath="/buffs/buff[@name='buffLBD_PerceptionManager']">
+		<effect_group name="Dead Eye">
+			<requirement name="HoldingItemHasTags" tags="perkDeadEye"/>
+
+			<!-- XP Gain -->
+			<triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: Dead Eye - Attempting XP Gain (@$lbd_xp_ranged_base)">
+				<requirement name="IsAlive" target="other"/> <!-- NEW -->
+				<requirement name="NotHasBuff" buff="buffLBD_perkDeadEye_XPCoolDown"/>
+				<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+			</triggered_effect>
+			<triggered_effect trigger="onSelfPrimaryActionRayHit" action="ModifyCVar" cvar="$perkdeadeye_lbd_xp" operation="add" value="@$lbd_xp_ranged_base">
+				<requirement name="IsAlive" target="other"/> <!-- NEW -->
+				<requirement name="NotHasBuff" buff="buffLBD_perkDeadEye_XPCoolDown"/>
+			</triggered_effect>
+
+			<!-- Cooldown Application -->
+			<triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: Dead Eye - Applying Cooldown">
+				<requirement name="IsAlive" target="other"/> <!-- NEW -->
+				<requirement name="NotHasBuff" buff="buffLBD_perkDeadEye_XPCoolDown"/>
+				<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+			</triggered_effect>
+			<triggered_effect trigger="onSelfPrimaryActionRayHit" action="AddBuff" buff="buffLBD_perkDeadEye_XPCoolDown">
+				<requirement name="IsAlive" target="other"/> <!-- NEW -->
+				<requirement name="NotHasBuff" buff="buffLBD_perkDeadEye_XPCoolDown"/>
+			</triggered_effect>
+
+			<!-- Level Up Check -->
+			<triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: Dead Eye - Triggering Level Up Check">
+				<requirement name="IsAlive" target="other"/> <!-- NEW -->
+				<requirement name="CVarCompare" cvar="$perkdeadeye_lbd_xp" operation="GTE" value="@$perkdeadeye_lbd_xptonext"/>
+				<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+			</triggered_effect>
+			<triggered_effect trigger="onSelfPrimaryActionRayHit" action="AddBuff" buff="buffLBD_perkDeadEye_LevelUpCheck">
+				<requirement name="IsAlive" target="other"/> <!-- NEW -->
+				<requirement name="CVarCompare" cvar="$perkdeadeye_lbd_xp" operation="GTE" value="@$perkdeadeye_lbd_xptonext"/>
+			</triggered_effect>
+		</effect_group>
+	</append>
+	<append xpath="/buffs">
+		<!-- Level-Up Handler for Dead Eye -->
+		<buff name="buffLBD_perkDeadEye_LevelUpCheck" hidden="true">
+			<stack_type value="ignore"/>
+			<duration value="1"/>
+			<effect_group>
+				<requirement name="CanPurchasePerk, SCore" progression_name="perkDeadEye"/>
+				<triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Dead Eye - Level Up SUCCESS (perkDeadEye)">
+				    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+				</triggered_effect>
+				<triggered_effect trigger="onSelfBuffStart" action="AddProgressionLevel" progression_name="perkDeadEye" level="1"/>
+				<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkdeadeye_lbd_xp" operation="subtract" value="@$perkdeadeye_lbd_xptonext"/>
+				<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkdeadeye_lbd_xptonext" operation="multiply" value="@$lbd_xp_curve_multiplier"/>
+				<triggered_effect trigger="onSelfBuffStart" action="ShowToolbeltMessage" message_key="perkDeadEyeLeveledUp"/>
+			</effect_group>
+			<effect_group>
+				<requirement name="!CanPurchasePerk, SCore" progression_name="perkDeadEye"/>
+				<triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Dead Eye - Level Up FAILED. Perk is locked by requirements.">
+					<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+				</triggered_effect>
+			</effect_group>
+		</buff>
+	</append>
+</configs>

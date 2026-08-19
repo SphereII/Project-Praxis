@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<xml>
+    <Name value="project_praxis_sphereii"/>
+    <DisplayName value="Project Praxis"/>
+    <Description
+            value="Proof of concept survival overhaul. Skills come from use, not from spending points, and fade if you stop. Describes the pack on the main menu; contains no gameplay changes of its own."/>
+    <Author value="sphereii"/>
+    <Version value="1.0.0.0"/>
+    <Website value="https://github.com/SphereII/SphereII.Mods/releases"/>
+</xml>

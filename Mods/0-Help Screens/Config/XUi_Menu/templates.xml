@@ -1,0 +1,142 @@
+<configs>
+
+	<!--
+		=========================================================================
+		MAIN MENU HELP PANEL BUILDING BLOCKS
+		=========================================================================
+
+		The in-game screen (XUi_InGame) has two levels of navigation: a modlet column
+		and a page strip. The main menu panel has one - a single row of tabs, one per
+		page, contributed by whoever wants one. It is 450px wide against the in-game
+		screen's 1260, which is why it does not try to carry a nav column as well.
+
+		Both templates here mirror their XUi_InGame counterparts in purpose:
+		helpmenu_tabbutton is declared once by the window and never by a contributor,
+		and helpmenu_page is the whole public API - one element per page.
+	-->
+	<append xpath="/templates">
+
+		<!--
+			Tab button for the strip along the top of the panel.
+
+			A scaled-down copy of vanilla's options_tabbutton + pagingheader_button pair
+			(XUi_Menu/templates.xml). Those are sized for the 1800px full-screen options
+			pages - font_size 30, collider_padding 20,8 - far too heavy for a 450px side
+			panel, and their font size is baked in rather than parameterised, so the
+			sizing had to be restated rather than passed in.
+
+			Structure requirements, from XUiC_TabSelectorButton.Init:
+			  - the outer rect carries controller="TabSelectorButton"
+			  - it needs either an XUiC_SimpleButton child, or ANY descendant view with
+			    on_press="true". XUiC_ButtonSelectable is not an XUiC_SimpleButton (it
+			    derives from XUiC_Button), so the label below is found by the on_press
+			    path, exactly as vanilla's is.
+
+			auto_toggle_selected="false" stops the label toggling its own selected state
+			on click - selection is owned by the TabSelector and comes back in via
+			selected="{tab_selected}".
+
+			Binding resolution: {tab_selected} and {tab_name_localized} live on the outer
+			TabSelectorButton controller, {btn_selected} and {btn_hovered} on the label's
+			own ButtonSelectable. Both resolve because BindingItemStandard walks
+			Controller.Parent until something answers, skipping plain XUiController nodes.
+			The defined() guard on the sprite mirrors vanilla, which guards one level down
+			from the button and not at the button itself.
+
+			NO name ATTRIBUTE, deliberately - the same as helpscreen_pagebutton in
+			XUi_InGame. The window declares this once under repeat_content and the harness
+			names each copy itself: XUiFromXml passes i.ToString() as the view name when it
+			expands a repeater. Declaring name="${name}" here would resolve against template
+			params that have no such entry.
+
+			SIZED TO ITS CELL rather than to its text. The strip used to be an XUiV_Table,
+			which packs children at their natural width, so the button was a 30x20 stub and
+			the label grew to fit through overflow="resizefreely". A grid gives every cell a
+			fixed 107x32 instead, so the rect takes the cell, the label fills the rect, and
+			overflow="ShrinkContent" scales the font down for a caption too long to fit
+			rather than letting it run into the neighbouring tab.
+
+			The click target grew with it. collider_padding is gone because the label is now
+			cell sized, so on_press covers the whole cell instead of just the glyphs.
+
+			The underline follows suit: anchored to the label edges rather than inset by
+			-10/+10 around the text, it now spans the cell. That is what makes a fixed strip
+			read as tabs rather than as words with lines under them.
+
+			This template was lbd_tab_button in SphereII Learn By Doing, which used to own
+			the whole panel. It moved here with the panel, and the sizing above is the only
+			substantive change since.
+		-->
+		<helpmenu_tabbutton width="107" height="32" font_size="18">
+			<rect width="${width}" height="${height}" controller="TabSelectorButton">
+				<label name="caption" controller="ButtonSelectable" auto_toggle_selected="false"
+				       selected="{tab_selected}" text="{tab_name_localized}"
+				       on_press="true" on_hover="true" gamepad_selectable="false" snap="false"
+				       depth="6" upper_case="true" font_size="${font_size}"
+				       pos="0,0" width="${width}" height="${height}"
+				       overflow="ShrinkContent" justify="center" pivot="topleft" max_line_count="1"
+				       color="{% btn_selected ? '255,255,255,255' : (btn_hovered ? '255,255,255,255' : '150,150,150,255') }"
+				       sound="[paging_click]" sound_play_on_hover="[default_hover]">
+
+					<sprite name="captionBorder" sprite="ui3_border_fade_U" depth="5" type="sliced"
+					        fillcenter="{% btn_hovered or (defined('btn_selected') and btn_selected) }"
+					        color="{% defined('btn_selected') and btn_selected ? '228,18,21,255' : '255,255,255,255' }"
+					        anchor_left="#parent,0,0" anchor_right="#parent,1,0"
+					        anchor_bottom="#parent,0,0" anchor_top="#parent,1,0" />
+				</label>
+			</rect>
+		</helpmenu_tabbutton>
+
+		<!--
+			A scrolling text page. This is the one element a contributor writes:
+
+			    <helpmenu_page tab_key="yourModMenuOverview" text_key="yourModMenuOverviewBody" />
+
+			tab_key doubles as the tab caption - XUiC_TabSelectorTab.TabKey's setter runs
+			it through Localization.Get, and the button opposite reads it back through
+			{tab_name_localized}. Literal \n in the CSV becomes a real newline (NGUI's
+			ByteReader.ReadCSV does Replace("\\n", "\n") while parsing), and mod
+			localization is loaded before the menu is built - ModManager.LoadLocalizations
+			runs at startup with _isLoadingInGame false - so menu text resolves.
+
+			SCROLLING is the reason this is a template and not two lines of literal XML.
+			The page area is 422x446; a body longer than that used to run straight off the
+			bottom of the panel, because XUi rects do not clip. The scroll rig below is the
+			same one helpscreen_page uses in XUi_InGame and the same one vanilla's own menu
+			windows use - a plain rect carrying on_scroll, holding a defaultscrollbar and a
+			scrollview as siblings. XUiV_ScrollView.InitView finds its bar with
+			Parent.TryGetChildView<XUiV_ScrollBar>(""), so the two must share a parent.
+			defaultscrollbar lives in XUi_Common, so it is available here as well as
+			in-game; vanilla's XUi_Menu/windows.xml uses it sixteen times.
+
+			The label is inset 10px from the top for the same reason the in-game one is:
+			clippingsoftness maps to NGUI's panel.clipSoftness, which fades by distance
+			from the clip edge rather than by scroll position, so text flush against the
+			top of the viewport would sit permanently half faded.
+
+			SIZES are literal on purpose. They track the window's tabsContents rect, which
+			works out at 430x454 - a 450 wide panel, less 2x10 content padding, and less
+			the 46 the tab strip and its rule take off the top. The scrollview leaves 30px
+			for the bar and the label another 10 so text never runs under it. Change these
+			and windows.xml together or not at all.
+		-->
+		<helpmenu_page tab_key="" text_key="" font_size="20" width="430" height="454">
+			<rect controller="TabSelectorTab" tab_key="${tab_key}">
+				<rect name="scrollarea" pos="0,0" width="${width}" height="${height}" depth="5"
+				      on_scroll="true" gamepad_selectable="false" snap="false">
+
+					<defaultscrollbar />
+
+					<scrollview pos="0,0" width="${width-30}" clippingsoftness="0,10">
+						<label depth="6" name="body" pos="0,-10" width="${width-40}" height="${height}"
+						       text_key="${text_key}" font_size="${font_size}" spacing_x="1"
+						       color="[lightestGrey]" pivot="topleft" justify="left"
+						       overflow="resizeheight" />
+					</scrollview>
+				</rect>
+			</rect>
+		</helpmenu_page>
+
+	</append>
+
+</configs>

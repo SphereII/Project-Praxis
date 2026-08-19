@@ -1,0 +1,53 @@
+<configs>
+	<!-- This is the effect_group from your LBD_Global_Init.xml file. -->
+	<!-- It contains all the necessary CVar initializers for the Perception LBD system. -->
+	<append xpath="/buffs/buff[@name='ProgressionLearnByDoing_Init']">
+		<effect_group>
+			<!-- Apply the Perception Manager Buff -->
+			<triggered_effect trigger="onSelfBuffRemove" action="AddBuff" buff="buffLBD_PerceptionManager"/>
+			<!-- Initializers for Perception CVars -->
+			<!-- attPerception -->
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$attperception_lbd_xp" operation="set" value="0"/>
+			<!-- Attribute first threshold. Was 5000, which at the ~10 XP/min a real session
+                 produces meant 8 hours for level 1 and about 209 hours to reach 10 -
+                 nearly seven times what maxing a five level perk costs, despite
+                 attributes accruing faster from their seven to nine award paths. At
+                 1200, the same number every perk uses, level 1 lands in under two
+                 hours and the full ten levels total 31,150, still three and a half
+                 times a perk's whole ladder. The 1.2 curve is global and unchanged. -->
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$attperception_lbd_xptonext" operation="set" value="1200"/>
+			<!-- perkDeadEye -->
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkdeadeye_lbd_xp" operation="set" value="0"/>
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkdeadeye_lbd_xptonext" operation="set" value="1200"/>
+			<!-- perkDemolitionsExpert -->
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkdemolitionsexpert_lbd_xp" operation="set" value="0"/>
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkdemolitionsexpert_lbd_xptonext" operation="set" value="1200"/>
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$lbd_xp_demolitions_bonus"  operation="set" value="20"/>
+			<!-- perkJavelinMaster -->
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkjavelinmaster_lbd_xp" operation="set" value="0"/>
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkjavelinmaster_lbd_xptonext" operation="set" value="1200"/>
+			<!-- perkSalvageOperations -->
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perksalvageoperations_lbd_xp" operation="set" value="0"/>
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perksalvageoperations_lbd_xptonext" operation="set" value="1200"/>
+			<!-- perkAnimalTracker -->
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkanimaltracker_lbd_xp" operation="set" value="0"/>
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkanimaltracker_lbd_xptonext" operation="set" value="1200"/>
+			<!-- perkFlurryOfPerception -->
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkflurryofperception_lbd_xp" operation="set" value="0"/>
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkflurryofperception_lbd_xptonext" operation="set" value="1200"/>
+			<!-- perkThePenetrator -->
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkpenetrator_lbd_xp" operation="set" value="0"/>
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkpenetrator_lbd_xptonext" operation="set" value="1200"/>
+			<!-- perkTreasureHunter -->
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perktreasurehunter_lbd_xp" operation="set" value="0"/>
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perktreasurehunter_lbd_xptonext" operation="set" value="1200"/>
+			<!-- perkInfiltrator -->
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkinfiltrator_lbd_xp" operation="set" value="0"/>
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkinfiltrator_lbd_xptonext" operation="set" value="1200"/>
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$infiltrator_placement_credits" operation="set" value="0"/>
+			<!-- perkPerceptionMastery -->
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkperceptionmastery_lbd_xp" operation="set" value="0"/>
+			<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkperceptionmastery_lbd_xptonext" operation="set" value="3000"/>
+		</effect_group>
+	</append>
+</configs>

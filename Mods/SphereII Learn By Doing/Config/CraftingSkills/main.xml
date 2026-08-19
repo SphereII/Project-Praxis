@@ -1,0 +1,34 @@
+<configs>
+    <!-- Includes the CVar initializers for the entire Strength tree. -->
+    <include filename="Init.xml"/>
+
+    <include filename="HarvestingTools.xml"/>
+    <include filename="RepairTools.xml"/>
+    <include filename="CraftingSalvageTools.xml"/>
+    <include filename="CraftingKnuckles.xml"/>
+    <include filename="CraftingBlades.xml"/>
+    <include filename="CraftingClubs.xml"/>
+    <include filename="CraftingSledgehammers.xml"/>
+    <include filename="CraftingBows.xml"/>
+    <include filename="CraftingSpears.xml"/>
+    <include filename="CraftingHandguns.xml"/>
+    <include filename="CraftingShotguns.xml"/>
+    <include filename="CraftingRifles.xml"/>
+    <include filename="CraftingMachineGuns.xml"/>
+    <include filename="CraftingExplosives.xml"/>
+    <include filename="CraftingRobotics.xml"/>
+    <include filename="CraftingArmor.xml"/>
+    <include filename="CraftingMedical.xml"/>
+    <include filename="CraftingFood.xml"/>
+    <include filename="CraftingElectrician.xml"/>
+    <include filename="CraftingSeeds.xml"/>
+    <include filename="CraftingWorkstations.xml"/>
+
+    <!-- This needs to be checked closely, since it's using Item but the items are blocks -->
+    <include filename="CraftingTraps.xml"/>
+    <include filename="CraftingVehicles.xml"/>
+
+    <!-- Decay Logic -->
+    <include filename="Crafting_Decay.xml" />
+
+</configs>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml>
+    <Name value="sphereii_help_screens"/>
+    <DisplayName value="SphereII Help Screens"/>
+    <Description value="An in-game help system other modlets can add their own pages to."/>
+    <Author value="sphereii"/>
+    <Version value="3.1.13.1446"/>
+    <Website value=""/>
+</xml>

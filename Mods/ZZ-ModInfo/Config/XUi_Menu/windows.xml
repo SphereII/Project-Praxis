@@ -1,0 +1,114 @@
+<configs>
+
+	<!--
+		=========================================================================
+		PROJECT PRAXIS - THE PACK'S FRONT PAGE
+		=========================================================================
+
+		This modlet exists to describe the pack and nothing else. It ships no blocks, no
+		items, no recipes and no code - only the text that appears on the main menu Mod
+		Summary panel, plus the one line that switches that panel on.
+
+		[ WHY IT IS ITS OWN MODLET ]
+		The description used to live in SphereII A Round World, which was wrong: that is a
+		standalone quality of life modlet that people install on its own, and it has no
+		business claiming to speak for a ten modlet overhaul it happens to ship inside.
+		Pack level text belongs to the pack.
+
+		Keeping it separate also means the wording can be changed without touching, or
+		re-releasing, any modlet that actually does something.
+
+		[ THE NAME ]
+		"ZZ-" so it sorts last. Mods apply in alphabetical order of folder name, and a
+		modlet patching a window that does not exist yet is skipped in full and silently,
+		so anything contributing to the panel has to load after 0-Help Screens declares
+		it. Sorting last also means this modlet gets the final word if any other file
+		touches the same tabs.
+
+		[ WHAT IT OWNS ]
+		Registering the panel (see this modlet's XUi_Menu/xui.xml - that append into the
+		mainMenu window_group is what makes it appear at all), and all four of its tabs.
+
+		The strip holds four and About is one of them, so this file repoints About at the
+		pack overview and spends the other three. THE PANEL IS FULL - a fifth page would
+		hand XUiC_TabSelectorTab.TabSelected a null TabButton, since it indexes Tabs[i]
+		against tabButtons[i] with no guard. Going further needs both of these first:
+
+		    <set xpath="/windows/window[@name='mainMenuHelpScreens']//grid[@name='tabButtons']/@cols">5</set>
+		    <set xpath="/windows/window[@name='mainMenuHelpScreens']//grid[@name='tabButtons']/@cell_width">86</set>
+
+		and captions shrink to fit their cell, so five is about the limit at 450px wide.
+
+		[ THE PACK IT DESCRIBES ]
+		    0-SCore, 0_TFP_Harmony      framework
+		    0-Help Screens              this panel and the in-game help screen
+		    SphereII Learn By Doing     use-based progression
+		    SphereII A Round World      quality of life, the Drop Box
+		    SphereII Challenges         80 extra challenges
+		    SphereII Peace of Mind      softened imagery and language
+		    SphereII Disable Sway       no camera or weapon sway
+		    SphereII Disable Special..  Chuck and the Rancher melee only
+		    Locks                       lock picking minigame
+		    ZZTong-Prefabs              233 POIs, 128 decorations, 58 RWG tiles
+		    ZZ-ModInfo                  this - the pack's name and description
+
+		Keep that list and the text in step when the pack changes. The ZZTong counts came
+		from the .tts files under its Prefabs folder rather than from its README, which
+		gives no totals; the text rounds them rather than quoting them, so a version bump
+		does not immediately make it wrong.
+
+		THE ZZTONG ATTRIBUTION IS NOT DECORATION - DO NOT TRIM IT. That modlet is GPLv3
+		and its README asks that anyone bundling the POIs credit the author, naming the
+		handle "ZZTong" or "zztong" specifically. The Comfort page therefore names both
+		the modlet (ZZTong Prefabs) and the author (ZZTong) in as many words. It is the
+		only third party content in this pack and the only entry carrying that obligation.
+
+		Two more player facing details from that README are worth keeping in the Comfort
+		page if it is ever rewritten: some of the hunters' traps are lethal, and the pack
+		has to be on the server AND every client, because server side alone loses POI
+		names and some trigger wiring.
+
+		[ ONE MORE HONEST NOTE, ON THE CHALLENGES PAGE ]
+		SphereII Challenges ships eight NPC hiring challenges, and this pack installs no
+		NPC modlet - there is no entity_class starting with "npc" anywhere in it. That
+		category is visible and can never be completed here, so the page says so rather
+		than leaving players hunting for something that is not there.
+
+		Wrapped in a conditional because the target window only exists if 0-Help Screens
+		is installed. mod_loaded() takes the ModInfo.xml <Name value="..."/>.
+	-->
+	<conditional>
+		<if cond="mod_loaded('sphereii_help_screens')">
+
+			<!--
+				The panel is switched on in this modlet's XUi_Menu/xui.xml, by appending
+				the window into the mainMenu window_group. It is not done here, and it is
+				not a visibility attribute - XUiV_Window.OnOpen forces IsVisible true
+				whenever its group opens, so an XML flag never survives. This file only
+				supplies content.
+			-->
+
+			<!--
+				Replace the placeholder About body with the pack overview. Tab 0 is what
+				opens, so that is where the general description belongs. The tab keeps its
+				"About" caption, which is the right word for it - only the body moves.
+
+				This patches a template INSTANTIATION, not a template's internals. The
+				helpmenu_page element is an ordinary node with ordinary attributes right up
+				until templates expand, and XPath patching runs before that - the same
+				timing that makes it impossible to append INTO a template.
+			-->
+			<set xpath="/windows/window[@name='mainMenuHelpScreens']//helpmenu_page[@tab_key='helpMenuAbout']/@text_key">zzPackOverviewBody</set>
+
+			<append xpath="/windows/window[@name='mainMenuHelpScreens']//rect[@name='tabsContents']">
+
+				<helpmenu_page tab_key="zzPackProgression" text_key="zzPackProgressionBody" />
+				<helpmenu_page tab_key="zzPackComfort"     text_key="zzPackComfortBody" />
+				<helpmenu_page tab_key="zzPackChallenges"  text_key="zzPackChallengesBody" />
+
+			</append>
+
+		</if>
+	</conditional>
+
+</configs>

@@ -1,0 +1,64 @@
+<configs>
+	<!-- Append the LBD logic for Boomstick to the main Strength Manager buff. -->
+	<append xpath="/buffs/buff[@name='buffLBD_StrengthManager']">
+		<effect_group name="Boomstick">
+			<requirement name="HoldingItemHasTags" tags="perkBoomstick"/>
+
+			<!-- XP Gain -->
+			<triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: Boomstick - Attempting XP Gain (+15)">
+				<requirement name="IsAlive" target="other"/> <!-- NEW -->
+				<requirement name="NotHasBuff" buff="buffLBD_perkBoomstick_XPCoolDown"/>
+				<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+			</triggered_effect>
+			<triggered_effect trigger="onSelfPrimaryActionRayHit" action="ModifyCVar" cvar="$perkboomstick_lbd_xp" operation="add" value="15">
+				<requirement name="IsAlive" target="other"/> <!-- NEW -->
+				<requirement name="NotHasBuff" buff="buffLBD_perkBoomstick_XPCoolDown"/>
+			</triggered_effect>
+
+			<!-- Cooldown Application -->
+			<triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: Boomstick - Applying Cooldown">
+				<requirement name="IsAlive" target="other"/> <!-- NEW -->
+				<requirement name="NotHasBuff" buff="buffLBD_perkBoomstick_XPCoolDown"/>
+				<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+			</triggered_effect>
+			<triggered_effect trigger="onSelfPrimaryActionRayHit" action="AddBuff" buff="buffLBD_perkBoomstick_XPCoolDown">
+				<requirement name="IsAlive" target="other"/> <!-- NEW -->
+				<requirement name="NotHasBuff" buff="buffLBD_perkBoomstick_XPCoolDown"/>
+			</triggered_effect>
+
+			<!-- Level Up Check -->
+			<triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: Boomstick - Triggering Level Up Check">
+				<requirement name="IsAlive" target="other"/> <!-- NEW -->
+				<requirement name="CVarCompare" cvar="$perkboomstick_lbd_xp" operation="GTE" value="@$perkboomstick_lbd_xptonext"/>
+				<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+			</triggered_effect>
+			<triggered_effect trigger="onSelfPrimaryActionRayHit" action="AddBuff" buff="buffLBD_perkBoomstick_LevelUpCheck">
+				<requirement name="IsAlive" target="other"/> <!-- NEW -->
+				<requirement name="CVarCompare" cvar="$perkboomstick_lbd_xp" operation="GTE" value="@$perkboomstick_lbd_xptonext"/>
+			</triggered_effect>
+		</effect_group>
+	</append>
+	<!-- Define the Level-Up Handler buff for Boomstick. -->
+	<append xpath="/buffs">
+		<buff name="buffLBD_perkBoomstick_LevelUpCheck" hidden="true">
+			<stack_type value="ignore"/>
+			<duration value="1"/>
+			<effect_group>
+				<requirement name="CanPurchasePerk, SCore" progression_name="perkBoomstick"/>
+				<triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Boomstick - Level Up SUCCESS (perkBoomstick)">
+				    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+				</triggered_effect>
+				<triggered_effect trigger="onSelfBuffStart" action="AddProgressionLevel" progression_name="perkBoomstick" level="1"/>
+				<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkboomstick_lbd_xp" operation="subtract" value="@$perkboomstick_lbd_xptonext"/>
+				<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkboomstick_lbd_xptonext" operation="multiply" value="@$lbd_xp_curve_multiplier"/>
+				<triggered_effect trigger="onSelfBuffStart" action="ShowToolbeltMessage" message_key="perkBoomstickLeveledUp"/>
+			</effect_group>
+			<effect_group>
+				<requirement name="!CanPurchasePerk, SCore" progression_name="perkBoomstick"/>
+				<triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Boomstick - Level Up FAILED. Perk is locked by requirements.">
+					<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+				</triggered_effect>
+			</effect_group>
+		</buff>
+	</append>
+</configs>

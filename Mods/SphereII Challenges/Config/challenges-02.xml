@@ -1,0 +1,162 @@
+<configs>
+
+    <append xpath="/challenges">
+        <challenge_category name="SCore01Category" title="SCore Challenges" icon="ui_game_symbol_challenge_category2"/>
+
+        <challenge_group category="SCore01Category" name="SCore01Group" title_key="SCore01challenges_key"
+                         reward_text_key="No Rewards" reward_event="NoEvent"/>
+        <challenge_group category="SCore01Category" name="SCore02Group" title_key="SCore02challenges_key"
+                         reward_text_key="No Rewards" reward_event="NoEvent"/>
+
+        <challenge_group category="SCore01Category" name="SCore03Group" title_key="SCore03challenges_key"
+                         reward_text_key="No Rewards" reward_event="NoEvent"/>
+        <challenge_group category="SCore01Category" name="SCore04Group" title_key="SCore04challenges_key"
+                         reward_text_key="No Rewards" reward_event="NoEvent"/>
+
+    </append>
+    <append xpath="/challenges">
+
+        <challenge name="Decap01" title_key="decap_title" icon="ui_game_symbol_quest" group="SCore01Group"
+                   short_description_key="challengeDecapZombies" description_key="challengeKillZombiesDesc"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="Decapitation, SCore" count="10" item_tag="knife,machete"/>
+        </challenge>
+
+        <challenge name="Decap02" title_key="decap_title" icon="ui_game_symbol_quest" group="SCore01Group"
+                   short_description_key="challengeDecapZombies" description_key="challengeKillZombiesDesc"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="Decapitation, SCore" count="10" item_tag="gun"/>
+        </challenge>
+
+        <challenge name="Decap03" title_key="decap_title" icon="ui_game_symbol_quest" group="SCore01Group"
+                   short_description_key="challengeDecapZombies" description_key="challengeKillZombiesDesc"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="Decapitation, SCore" count="10" item_tag="bow"/>
+        </challenge>
+
+        <challenge name="CraftWith01" title_key="craftWith01_title" icon="ui_game_symbol_quest" group="SCore01Group"
+                   short_description_key="craftWith01Short" description_key="craftWith01Short"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="CraftWithIngredient, SCore" count="2" ingredient="resourceLegendaryParts"/>
+        </challenge>
+
+        <challenge name="CraftWith02" title_key="craftWith02_title" icon="ui_game_symbol_quest" group="SCore01Group"
+                   short_description_key="craftWith02Short" description_key="craftWith02Short"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="CraftWithIngredient, SCore" count="2" ingredient="resourceWood"/>
+        </challenge>
+
+    </append>
+
+    <!-- FIre bug -->
+    <append xpath="/challenges">
+
+        <challenge name="BurnWithFire01" title_key="BurnWithFire01" icon="ui_game_symbol_quest" group="SCore02Group"
+                   short_description_key="BurnWithFire01Desc" description_key="BurnWithFire01Desc"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="BlockDestroyedByFire, SCore" count="20"/>
+        </challenge>
+
+        <challenge name="BurnWithFire02" title_key="BurnWithFire02" icon="ui_game_symbol_quest" group="SCore02Group"
+                   short_description_key="BurnWithFire02Desc" description_key="BurnWithFire02Desc"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="StartFire, SCore" count="1"/>
+        </challenge>
+
+        <challenge name="BurnWithFire03" title_key="onBigFire" icon="ui_game_symbol_quest" group="SCore02Group"
+                   short_description_key="onBigFireDesc" description_key="onBigFireDesc"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="BigFire, SCore" count="20"/>
+        </challenge>
+
+        <challenge name="ExtinguishFire01" title_key="onExtinguish" icon="ui_game_symbol_quest" group="SCore02Group"
+                   short_description_key="onExtinguishDesc" description_key="onExtinguishDesc"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="ExtinguishFire, SCore" count="20"/>
+        </challenge>
+
+
+    </append>
+
+    <append xpath="/challenges">
+        <challenge name="Harvest01" title_key="onHarvest" icon="ui_game_symbol_quest" group="SCore03Group"
+                   short_description_key="onHarvest" description_key="onHarvest"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="Harvest, SCore" count="20" item="resourceWood" held_tags="axe" biome="burnt_forest"/>
+            <objective type="Harvest, SCore" count="20" item="resourceWood" held_tags="axe"
+                       block_tag="challenge_pallet"/>
+        </challenge>
+
+        <challenge name="Harvest02" title_key="onHarvest" icon="ui_game_symbol_quest" group="SCore03Group"
+                   short_description_key="onHarvest" description_key="onHarvest"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="Harvest, SCore" count="20" item_tags="axe" block_tag="wood"/>
+        </challenge>
+
+        <challenge name="LocalizationTest" title_key="title_key" icon="ui_game_symbol_quest" group="SCore03Group"
+                   short_description_key="short_description_key" description_key="description_key"
+                   reward_text_key="reward_text_key" reward_event="challenge_reward_1000">
+            <objective type="KillWithItem, SCore" count="10" item="gunRifleT0PipeRifle"/>
+        </challenge>
+
+        <challenge name="scoreUpgradeTest" title_key="challengeUpgradeBlocks"
+                   icon="ui_game_symbol_challenge_homesteading_upgrade_block" group="SCore03Group"
+                   prerequisite_hint="challengeUpgradeBlocksHint1" hint="challengeUpgradeBlocksHint2"
+                   short_description_key="challengeUpgradeBlocksShort" description_key="challengeUpgradeBlocksDesc">
+            <objective type="BlockUpgradeSCore,SCore" block="frameShapes:VariantHelper" count="10"
+                       held="meleeToolRepairT0StoneAxe" needed_resource="resourceWood" needed_resource_count="8"/>
+        </challenge>
+
+        <challenge name="scoreUpgradeTest_tags" title_key="challengeUpgradeBlocks"
+                   icon="ui_game_symbol_challenge_homesteading_upgrade_block" group="SCore03Group"
+                   prerequisite_hint="challengeUpgradeBlocksHint1" hint="challengeUpgradeBlocksHint2"
+                   short_description_key="challengeUpgradeBlocksShort" description_key="challengeUpgradeBlocksDesc">
+            <objective type="BlockUpgradeSCore,SCore" block_tags="wood" count="10" held="meleeToolRepairT0StoneAxe"
+                       needed_resource="resourceWood" needed_resource_count="8"/>
+        </challenge>
+
+        <challenge name="scoreUpgradeTest_biome" title_key="challengeUpgradeBlocks"
+                   icon="ui_game_symbol_challenge_homesteading_upgrade_block" group="SCore03Group"
+                   prerequisite_hint="challengeUpgradeBlocksHint1" hint="challengeUpgradeBlocksHint2"
+                   short_description_key="challengeUpgradeBlocksShort" description_key="challengeUpgradeBlocksDesc">
+            <objective type="BlockUpgradeSCore,SCore" block_tags="wood" count="10" biome="burnt_forest"/>
+        </challenge>
+    </append>
+
+
+    <append xpath="/challenges">
+        <challenge name="Gather01" title_key="gather01_title" icon="ui_game_symbol_quest" group="SCore04Group"
+                   short_description_key="gather01_short" description_key="gather01_desc"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="GatherTags, SCore" item_tags="junk" count="10"/>
+        </challenge>
+
+        <challenge name="Wear01" title_key="wear01_title" icon="ui_game_symbol_challenge_basics_wear_clothing" group="SCore04Group"
+                   hint="challengeWearClothesHint1"
+                   short_description_key="wear01_short" description_key="wear01_desc"
+            reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+
+            <objective type="WearTags,SCore" item_tags="armorHead"/>
+            <objective type="WearTags,SCore" item_tags="armorChest"/>
+
+        </challenge>
+
+        <challenge name="ClearPoi" title_key="ClearPoi_title" icon="ui_game_symbol_challenge_basics_wear_clothing" group="SCore04Group"
+                   hint="challengeClearPoiHint1"
+                   short_description_key="ClearPoi_short" description_key="ClearPoi_desc"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+
+            <objective type="ClearSleepers,SCore" biome="pine_forest" count="20"/>
+
+        </challenge>
+
+        <challenge name="ClearPoi2" title_key="ClearPoi_title" icon="ui_game_symbol_challenge_basics_wear_clothing" group="SCore04Group"
+                   hint="challengeClearPoiHint1"
+                   short_description_key="ClearPoi_short" description_key="ClearPoi_desc"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+
+            <objective type="ClearSleepers,SCore" biome="burnt_forest" count="20"/>
+
+        </challenge>
+    </append>
+</configs>

@@ -1,0 +1,135 @@
+<configs>
+
+	<!--
+		=========================================================================
+		HELP SCREEN BUILDING BLOCKS
+		=========================================================================
+
+		The screen has two levels of navigation:
+
+		    left column   one button per contributing modlet  (outer TabSelector)
+		    top tab strip that modlet's pages                 (inner TabSelector, one per section)
+
+		Both levels are vanilla XUiC_TabSelector. Nesting one inside another is safe:
+		XUiController.GetChildControllers adds a match and then STOPS descending
+		(if match -> add; else -> recurse), so the outer selector collects the section
+		rects and never reaches an inner selector's own tabs.
+
+		[ WHY A SECTION IS NOT A ONE LINER ]
+		A section cannot be a single template call. Two rules collide:
+
+		  1. XUiFromXml.createFromTemplate rejects a template instantiation that has child
+		     nodes - "Instantiation of templates may not have any child nodes!" - and
+		     quietly yields an empty view (warned only under -debugxui). So a section
+		     template cannot wrap page templates.
+		  2. XPath patching runs against the raw XML, BEFORE templates expand. So a
+		     section template's internals do not exist as nodes, and nothing can append
+		     pages into them afterwards.
+
+		Hence a contributing modlet appends the section shell as literal XML and fills it
+		with page templates. The shell is a dozen lines, all of it copy-paste - see the
+		worked example in windows.xml and the ReadMe.
+	-->
+	<append xpath="/templates">
+
+		<!--
+			Left column button. One declaration serves every section: the grid that holds
+			it uses repeat_content="true", and XUiC_TabSelector pairs button[i] with
+			section[i], each button reading its caption off its section through
+			{tab_name_localized}. Contributors never declare one.
+
+			Styling is left to the stock simplebutton defaults, which is what gives these
+			their border: the template already contains
+			<sprite name="border" sprite="${bordersprite}" fillcenter="false"/>, defaulting
+			to menu_empty2px in [black]. Inheriting also picks up vanilla's hover and
+			selection treatment - ui_game_select_row, white on hover, mediumGrey when
+			selected. Only defaultcolor is overridden, to sit unselected entries back a
+			shade so the current one reads clearly.
+
+			An earlier version set bordercolor="[transparent]" here, copied from vanilla's
+			prefab editor tab strip. That is right for tabs, which butt against each other
+			and use a separator sprite instead (see helpscreen_pagebutton below), and wrong
+			for a list of separate buttons.
+
+			The grid's cell is 48 against a 44 button, so the 2px borders of adjacent
+			entries never touch.
+		-->
+		<helpscreen_navbutton width="216">
+			<rect controller="TabSelectorButton">
+				<simplebutton name="navButton" depth="2" pos="0,0" width="${width}" height="44"
+				              font_size="28" defaultcolor="[darkGrey]"
+				              caption="{tab_name_localized}"
+				              snap="false" gamepad_selectable="false" />
+			</rect>
+		</helpscreen_navbutton>
+
+		<!--
+			Page tab, for the strip along the top of a section. Same repeat_content trick
+			as the nav button, so a section declares this once no matter how many pages it
+			holds.
+
+			bordercolor="[transparent]" is deliberate here and NOT an oversight. These tabs
+			are 240 wide in a 240 cell, so they touch; a border on each would double up
+			along every shared edge. Vanilla solves it the same way - no border, plus the
+			explicit 2px separator sprite below. Leave the borders to the nav buttons,
+			which are spaced apart.
+		-->
+		<helpscreen_pagebutton>
+			<rect controller="TabSelectorButton">
+				<simplebutton name="tabButton" depth="2" pos="-1,0" width="240" height="36"
+				              font_size="26" bordercolor="[transparent]" defaultcolor="[darkGrey]"
+				              selectedsprite="menu_empty" selectedcolor="[mediumGrey]"
+				              foregroundlayer="false" caption="{tab_name_localized}"
+				              snap="false" gamepad_selectable="false" />
+				<sprite depth="8" sprite="menu_empty2px" pos="238,0" width="2" height="35" color="[black]" />
+			</rect>
+		</helpscreen_pagebutton>
+
+		<!--
+			A scrolling text page. This is what a contributor actually writes, one per page:
+
+			    <helpscreen_page tab_key="yourModOverview" text_key="yourModOverviewBody" />
+
+			tab_key doubles as the tab caption - XUiC_TabSelectorTab.TabKey's setter runs it
+			through Localization.Get, and the button opposite reads it back. Literal \n in
+			the CSV becomes a real newline (NGUI ByteReader.ReadCSV does
+			Replace("\\n", "\n") while parsing).
+
+			The page scrolls. Confirmed in game with a body about ten times the viewport:
+			the label grows past the panel on overflow="resizeheight" and the scrollview
+			takes its bounds from that, so there is no practical ceiling on page length.
+			The bar hides itself when the text fits, which is why short pages show none.
+
+			SIZES are literal on purpose. createFromTemplate does seed width/height from the
+			parent's InnerSize, but template defaults are copied over the top of those
+			(_overwriteExisting: true), and the point of this template is that contributors
+			need not reason about either. They track the section's tabsContents rect
+			(964 x 615); the scrollview leaves 30px for the scrollbar and the label another
+			10px so text never runs under it. Change them together or not at all.
+		-->
+		<helpscreen_page tab_key="" text_key="" font_size="26" width="964" height="615">
+			<rect controller="TabSelectorTab" tab_key="${tab_key}">
+				<rect name="scrollarea" pos="0,0" width="${width}" height="${height}" depth="2"
+				      on_scroll="true" gamepad_selectable="true" snap="false" use_selection_box="true">
+
+					<defaultscrollbar />
+
+					<!--
+						The label is inset by the clipping softness for the same reason the nav
+						grid is: clippingsoftness becomes NGUI's panel.clipSoftness, which fades
+						by distance from the clip edge rather than by scroll position, so text
+						flush against the top of the viewport stays permanently half faded.
+						10px down puts the first line clear of it.
+					-->
+					<scrollview pos="5,0" width="${width-30}" clippingsoftness="0,10">
+						<label name="body" depth="4" pos="0,-10" width="${width-40}" height="${height}"
+						       text_key="${text_key}" font_size="${font_size}" color="[white]"
+						       pivot="topleft" justify="left" overflow="resizeheight" />
+					</scrollview>
+				</rect>
+			</rect>
+		</helpscreen_page>
+
+	</append>
+
+</configs>

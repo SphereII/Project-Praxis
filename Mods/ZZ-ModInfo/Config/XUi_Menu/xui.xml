@@ -1,0 +1,33 @@
+<configs>
+
+	<!--
+		Register the Mod Summary panel with the main menu. THIS is what makes it appear.
+
+		0-Help Screens defines the mainMenuHelpScreens window but deliberately adds it to
+		no window_group, so on its own it is never opened and never drawn. Appending it
+		here is the pack opting in.
+
+		It has to be a window_group append rather than a visibility flag, because
+		XUiV_Window.OnOpen sets base.IsVisible = true unconditionally every time its group
+		opens - a visible="false" in XML is discarded the moment the menu comes up. The
+		full reasoning is in 0-Help Screens/Config/XUi_Menu/xui.xml.
+
+		The group's defaultselected="btnPlayGame" is untouched. The panel's tab buttons set
+		gamepad_selectable="false", so nothing here enters gamepad navigation and the Play
+		button keeps focus on open.
+
+		Load order: mods apply in alphabetical order of folder name, so "ZZ-ModInfo" is
+		applied long after "0-Help Screens" has declared both the window and the group
+		entry this patches into.
+	-->
+	<conditional>
+		<if cond="mod_loaded('sphereii_help_screens')">
+
+			<append xpath="/xui/window_group[@name='mainMenu']">
+				<window name="mainMenuHelpScreens" />
+			</append>
+
+		</if>
+	</conditional>
+
+</configs>

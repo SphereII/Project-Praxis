@@ -1,0 +1,310 @@
+﻿using Platform;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using UnityEngine;
+
+public class BlockSpawnCube2SDX : BlockMotionSensor
+{
+    // Diagnostic logging to confirm whether these calls ever run off the main Unity thread
+    // (e.g. from chunk generation) - remove once the chunk-corruption bug is root-caused.
+    private static void LogThreadInfo(string tag, Vector3i _blockPos)
+    {
+        return;
+        Debug.LogWarning($"[SpawnCubeThreadDiag] {tag} pos={_blockPos} " +
+            $"mainThread={ThreadManager.IsMainThread()} " +
+            $"threadId={Thread.CurrentThread.ManagedThreadId} " +
+            $"time={DateTime.Now:HH:mm:ss.fff}");
+    }
+
+    private int OwnerID = -1;
+    private float _tickRate = 10UL; // Default tick rate
+    protected int _maxSpawned = 1;    // Max entities to spawn
+    private int _numberToSpawn = 1; // Number of entities to spawn per tick (if applicable)
+    private int _spawnRadius = 0;   // Radius for random spawn points
+    private int _spawnArea = 15;    // Area for random spawn points
+
+    private string _entityGroup = ""; // Entity group defined in XML
+    private string _signText = "";    // Text from a sign, used for config
+
+    public override void Init()
+    {
+        base.Init();
+        if (Properties.Values.ContainsKey("TickRate"))
+            Properties.ParseFloat("TickRate", ref _tickRate);
+        if (Properties.Values.ContainsKey("MaxSpawned"))
+            Properties.ParseInt("MaxSpawned", ref _maxSpawned);
+        if (Properties.Values.ContainsKey("NumberToSpawn"))
+            Properties.ParseInt("NumberToSpawn", ref _numberToSpawn);
+        if (Properties.Values.ContainsKey("SpawnRadius"))
+            Properties.ParseInt("SpawnRadius", ref _spawnRadius);
+        if (Properties.Values.ContainsKey("SpawnArea"))
+            Properties.ParseInt("SpawnArea", ref _spawnArea);
+        if (Properties.Values.ContainsKey("EntityGroup"))
+            _entityGroup = Properties.Values["EntityGroup"];
+        if (Properties.Values.ContainsKey("Config"))
+            _signText = Properties.Values["Config"];
+    }
+
+    public override string GetActivationText(WorldBase _world, BlockValue _blockValue, Vector3i _blockPos,
+        EntityAlive _entityFocusing)
+    {
+        return "";
+    }
+
+    public override void OnBlockAdded(WorldBase _world, Chunk _chunk, Vector3i _blockPos, BlockValue _blockValue,
+        PlatformUserIdentifierAbs _addedByPlayer)
+    {
+        base.OnBlockAdded(_world, _chunk, _blockPos, _blockValue, _addedByPlayer);
+        LogThreadInfo("OnBlockAdded", _blockPos);
+
+        // POI-decorated spawn cubes get OnBlockAdded from the chunk generation worker thread,
+        // not the main thread - scheduling/damaging/removing a TE from there races the
+        // generation thread still serializing this same chunk and corrupts the save. Only
+        // self-schedule here when we're actually on the main thread (i.e. a player just placed
+        // this block live); OnBlockLoaded below is the safe trigger for the generation case.
+        if (!ThreadManager.IsMainThread()) return;
+
+        ScheduleInitialTick(_world, _blockPos);
+    }
+
+    public override void OnBlockLoaded(WorldBase _world, Vector3i _blockPos, BlockValue _blockValue)
+    {
+        base.OnBlockLoaded(_world, _blockPos, _blockValue);
+        LogThreadInfo("OnBlockLoaded", _blockPos);
+
+        ScheduleInitialTick(_world, _blockPos);
+    }
+
+    private void ScheduleInitialTick(WorldBase _world, Vector3i _blockPos)
+    {
+        if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
+        if (GameManager.Instance.IsEditMode()) return;
+
+        _world.GetWBT().AddScheduledBlockUpdate(_blockPos, blockID, (ulong)1UL);
+    }
+
+    // BlockMotionSensor.OnBlockAdded creates a TileEntityPoweredTrigger for us, but never
+    // removes it on our behalf - every other custom TE-owning block in this codebase does
+    // this cleanup explicitly, so we need to as well or a stale TE survives block destruction
+    // and corrupts the chunk save.
+    public override void OnBlockRemoved(WorldBase world, Chunk _chunk, Vector3i _blockPos, BlockValue _blockValue)
+    {
+        base.OnBlockRemoved(world, _chunk, _blockPos, _blockValue);
+        LogThreadInfo("OnBlockRemoved", _blockPos);
+        _chunk.RemoveTileEntityAt<TileEntityPoweredTrigger>((World)world, World.toBlock(_blockPos));
+    }
+
+    // Made public virtual by your previous request, which is good for overriding.
+    public virtual void DestroySelf(Vector3i _blockPos, BlockValue _blockValue)
+    {
+        LogThreadInfo("DestroySelf", _blockPos);
+        var keep = PathingCubeParser.GetValue(_signText, "keep");
+        if (!string.IsNullOrEmpty(keep))
+        {
+            // "keep" leaves the cube block in place, so its TileEntityPoweredTrigger stays
+            // valid - just re-schedule and return.
+            GameManager.Instance.World.GetWBT().AddScheduledBlockUpdate(_blockPos, blockID, (ulong)10000UL);
+            return;
+        }
+
+        // Remove our TileEntityPoweredTrigger explicitly before the block goes away. OnBlockRemoved
+        // also does this, but only if the block change actually routes through it; DamageBlock can
+        // downgrade to a non-powered block (or the write can race a background chunk save) and leave
+        // the trigger TE orphaned on a non-powered block, which corrupts the chunk on its next load.
+        // Doing it here, on the main thread, guarantees the TE and block never desync.
+        RemovePoweredTrigger(_blockPos);
+
+        DamageBlock(GameManager.Instance.World, new BlockValueRef(_blockPos), _blockValue, Block.list[_blockValue.type].MaxDamage,
+            -1, default(ItemActionAttack.AttackHitInfo), false);
+    }
+
+    // Idempotent with OnBlockRemoved's cleanup; safe to call from either.
+    private void RemovePoweredTrigger(Vector3i _blockPos)
+    {
+        if (!ThreadManager.IsMainThread())
+        {
+            // TE removal must not run off the main thread; defer it.
+            ThreadManager.AddSingleTaskMainThread("SCore.SpawnCube.RemovePoweredTrigger",
+                delegate { RemovePoweredTrigger(_blockPos); });
+            return;
+        }
+
+        var world = GameManager.Instance.World;
+        if (world.GetChunkFromWorldPos(_blockPos) is Chunk chunk)
+            chunk.RemoveTileEntityAt<TileEntityPoweredTrigger>((World)world, World.toBlock(_blockPos));
+    }
+
+    // Made public virtual by your previous request, which is good for overriding.
+    public virtual void ApplySignData(EntityAlive entity, Vector3i _blockPos)
+    {
+        // Read the sign for expected values.
+        var Task = PathingCubeParser.GetValue(_signText, "task");
+        var Buff = PathingCubeParser.GetValue(_signText, "buff");
+        var PathingCode = PathingCubeParser.GetValue(_signText, "pc");
+        var setLeader = PathingCubeParser.GetValue(_signText, "leader");
+
+        if (Task.ToLower() == "stay")
+            entity.Buffs.AddBuff("buffOrderStay");
+        if (Task.ToLower() == "wander")
+            entity.Buffs.AddBuff("buffOrderWander");
+        if (Task.ToLower() == "guard")
+            entity.Buffs.AddBuff("buffOrderGuard");
+        if (Task.ToLower() == "follow")
+            entity.Buffs.AddBuff("buffOrderFollow");
+
+        if (!string.IsNullOrEmpty(Buff))
+        {
+            foreach (var buff in Buff.Split(','))
+                if (!string.IsNullOrEmpty(buff.Trim())) // Ensure no empty strings from split
+                    entity.Buffs.AddBuff(buff.Trim());
+        }
+
+
+        // Set up the pathing cube if available
+        if (!string.IsNullOrEmpty(PathingCode))
+        {
+            if (StringParsers.TryParseFloat(PathingCode, out var pathingCode))
+                entity.Buffs.SetCustomVar("PathingCode", pathingCode);
+        }
+
+        // We are using the tile entity to transfer the owner ID from the client to the player.
+        var tileEntity = GameManager.Instance.World.GetTileEntity(_blockPos) as TileEntityPoweredTrigger;
+        if (tileEntity != null)
+        {
+            var persistentPlayerList = GameManager.Instance.GetPersistentPlayerList();
+            var playerData = persistentPlayerList.GetPlayerData(tileEntity.GetOwner());
+            if (playerData != null)
+                OwnerID = playerData.EntityId; // Set OwnerID for this instance of the block class
+
+            // Set up ownership, but only after the entity is spawned.
+            if (OwnerID > 0 && !string.IsNullOrEmpty(setLeader))
+            {
+                EntityUtilities.SetLeaderAndOwner(entity.entityId, (int)OwnerID, false);
+            }
+        }
+    }
+
+    // New: Helper method to provide the tick rate as ulong for scheduling.
+    protected ulong GetTickRate()
+    {
+        // Ensure _tickRate is positive to avoid issues with scheduling
+        if (_tickRate <= 0f) return 10UL; // Default to 10 ticks if misconfigured
+        return (ulong)_tickRate;
+    }
+
+    /// <summary>
+    /// Attempts to spawn an entity based on the block's configuration.
+    /// Does NOT handle _blockValue.meta increment or scheduling.
+    /// </summary>
+    /// <returns>True if an entity was successfully created and spawned, false otherwise.</returns>
+    protected virtual bool TrySpawnEntity(WorldBase _world, Vector3i _blockPos, BlockValue _blockValue)
+    {
+        var size = Vector3.one * 2f;
+        if (isMultiBlock)
+        {
+            size = multiBlockPos.dim;
+        }
+
+        var chunkCluster = _world.ChunkCache;
+        if (chunkCluster == null) return false;
+        if ((Chunk)chunkCluster.GetChunkFromWorldPos(_blockPos) == null) return false;
+
+        var entityId = -1;
+        var text = PathingCubeParser.GetValue(_signText, "ec"); // Explicit Class ID
+        if (string.IsNullOrEmpty(text))
+        {
+            var group = PathingCubeParser.GetValue(_signText, "eg"); // Entity Group
+            if (string.IsNullOrEmpty(group))
+            {
+                if (string.IsNullOrEmpty(_entityGroup))
+                {
+                    // No entity group from sign or properties, cannot proceed.
+                    Debug.LogWarning($"BlockSpawnCube2SDX at {_blockPos}: No EntityGroup or 'eg' specified. Cannot spawn.");
+                    return false;
+                }
+                group = _entityGroup;
+            }
+
+            var ClassID = 0;
+            entityId = EntityGroups.GetRandomFromGroup(group, ref ClassID);
+            if (entityId == 0)
+            {
+                Debug.LogWarning($"BlockSpawnCube2SDX at {_blockPos}: Entity group '{group}' is invalid or empty. Cannot spawn.");
+                return false;
+            }
+        }
+        else
+        {
+                entityId = text.GetHashCode();
+        }
+
+        var transformPos = _blockPos.ToVector3() + new Vector3(0.5f, 0.25f, 0.5f);
+        if (_spawnRadius > 0)
+        {
+            int x, y, z;
+            if (!GameManager.Instance.World.FindRandomSpawnPointNearPosition(_blockPos, 15, out x, out y, out z, new Vector3(_spawnArea, _spawnArea, _spawnArea), true))
+            {
+                return false; // Failed to find a suitable random spawn point
+            }
+            transformPos.x = x;
+            transformPos.y = y;
+            transformPos.z = z;
+        }
+
+        var rotation = new Vector3(0f, (float)(45f * (_blockValue.rotation & 3)), 0f);
+        var blockEntity = ((Chunk)_world.GetChunkFromWorldPos(_blockPos)).GetBlockEntity(_blockPos);
+        if (blockEntity != null && blockEntity.bHasTransform)
+            rotation = blockEntity.transform.rotation.eulerAngles;
+
+        var entity = EntityFactory.CreateEntity(entityId, transformPos, rotation) as EntityAlive;
+        if (entity == null)
+        {
+            Debug.LogWarning($"BlockSpawnCube2SDX at {_blockPos}: Failed to create entity with ID {entityId}.");
+            return false;
+        }
+
+        entity.SetSpawnerSource(EnumSpawnerSource.StaticSpawner);
+        GameManager.Instance.World.SpawnEntityInWorld(entity);
+        ApplySignData(entity, _blockPos);
+
+        return true; // Entity successfully spawned
+    }
+
+    // The base class's default UpdateTick behavior:
+    // Spawns one entity, increments meta, schedules next tick, and destroys itself if maxSpawned is reached.
+    public override bool UpdateTick(WorldBase _world, Vector3i _blockPos, BlockValue _blockValue,
+        bool _bRandomTick, ulong _ticksIfLoaded, GameRandom _rnd)
+    {
+        LogThreadInfo("UpdateTick", _blockPos);
+        if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+        {
+            if (_blockValue.meta >= _maxSpawned)
+            {
+                DestroySelf(_blockPos, _blockValue);
+                return false; // Max spawns reached, stop ticking
+            }
+
+            // Attempt to spawn an entity using the common logic
+            if (TrySpawnEntity(_world, _blockPos, _blockValue))
+            {
+                // If successful, increment meta and update block RPC
+                _blockValue.meta++;
+                GameManager.Instance.World.SetBlockRPC(_blockPos, _blockValue);
+                // Debug.Log($"BlockSpawnCube2SDX: Spawned entity. Current meta: {_blockValue.meta}"); // For debugging
+            }
+
+            if (_blockValue.meta >= _maxSpawned)
+            {
+                DestroySelf(_blockPos, _blockValue);
+            }
+            else
+            {
+                _world.GetWBT().AddScheduledBlockUpdate(_blockPos, blockID, GetTickRate());
+            }
+        }
+
+        // For clients, just ensure the block remains in the world.
+        return true;
+    }
+}

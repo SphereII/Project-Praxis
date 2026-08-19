@@ -1,0 +1,193 @@
+<configs>
+    <append xpath="/buffs/buff[@name='buffLBD_GeneralManager']">
+        <effect_group name="LBD Crafting Skill - Food">
+            <triggered_effect trigger="onSelfItemCrafted" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Food - Attempting 'Craft' XP (+@$lbd_xp_crafting_base)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                <requirement name="!RequirementCraftedItemMatchesCVar, SCore" cvar="$craftingfood_lbd_lastitem"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemCrafted" action="ModifyCVar" cvar="$craftingfood_lbd_xp" operation="add" value="@$lbd_xp_crafting_base">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+                <requirement name="!RequirementCraftedItemMatchesCVar, SCore" cvar="$craftingfood_lbd_lastitem"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfScrapItem" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Food - Attempting 'Scrap' XP (+@$lbd_xp_scrapping_base)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfScrapItem" action="ModifyCVar" cvar="$craftingfood_lbd_xp" operation="add" value="@$lbd_xp_scrapping_base">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfItemRepaired" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Food - Attempting 'Repair' XP (+@$lbd_xp_repairing_base)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemRepaired" action="ModifyCVar" cvar="$craftingfood_lbd_xp" operation="add" value="@$lbd_xp_repairing_base">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfItemCrafted" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Food - Applying Cooldown (Craft)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemCrafted" action="AddBuff" buff="buffLBD_craftingFood_ActionCoolDown">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfScrapItem" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Food - Applying Cooldown (Scrap)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfScrapItem" action="AddBuff" buff="buffLBD_craftingFood_ActionCoolDown">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfItemRepaired" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Food - Applying Cooldown (Repair)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemRepaired" action="AddBuff" buff="buffLBD_craftingFood_ActionCoolDown">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfItemCrafted" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Food - Triggering Level Up Check (Craft)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="CVarCompare" cvar="$craftingfood_lbd_xp" operation="GTE" value="@$craftingfood_lbd_xptonext"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemCrafted" action="AddBuff" buff="buffLBD_craftingFood_LevelUpCheck">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="CVarCompare" cvar="$craftingfood_lbd_xp" operation="GTE" value="@$craftingfood_lbd_xptonext"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfScrapItem" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Food - Triggering Level Up Check (Scrap)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="CVarCompare" cvar="$craftingfood_lbd_xp" operation="GTE" value="@$craftingfood_lbd_xptonext"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfScrapItem" action="AddBuff" buff="buffLBD_craftingFood_LevelUpCheck">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="CVarCompare" cvar="$craftingfood_lbd_xp" operation="GTE" value="@$craftingfood_lbd_xptonext"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfItemRepaired" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Food - Triggering Level Up Check (Repair)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="CVarCompare" cvar="$craftingfood_lbd_xp" operation="GTE" value="@$craftingfood_lbd_xptonext"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemRepaired" action="AddBuff" buff="buffLBD_craftingFood_LevelUpCheck">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingFood"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="CVarCompare" cvar="$craftingfood_lbd_xp" operation="GTE" value="@$craftingfood_lbd_xptonext"/>
+            </triggered_effect>
+            <!-- Remember what was just crafted. Ordered last so the awards above
+                 compare against the PREVIOUS craft, not this one. A queue of twenty
+                 identical items now scores once; twenty different items score twenty
+                 times. A cooldown cannot make that distinction - when an item takes
+                 longer to craft than the cooldown lasts, every craft in the queue
+                 scores regardless. -->
+            <triggered_effect trigger="onSelfItemCrafted" action="SetCVarFromItemType, SCore" cvar="$craftingfood_lbd_lastitem"/>
+
+        </effect_group>
+
+    
+    </append>
+
+    <!--
+        =====================================================================
+        COOKING THAT THE UnlockedBy PATH CANNOT SEE
+        =====================================================================
+
+        The craft path above gates on the crafted ITEM carrying UnlockedBy=craftingFood.
+        That misses things. drinkJarBoiledWater has no UnlockedBy property at all, so
+        boiling water - one of the most common things anyone does at a campfire - trained
+        this skill nothing. Only 37 items in the game carry that property.
+
+        Recipe tags do not have the gap. 42 of the 43 campfire recipes are tagged
+        perkMasterChef, boiled water among them, so the tag describes "this was cooking"
+        better than any property on the result does.
+
+        WHY A SECOND GROUP RATHER THAN A REPLACEMENT. The two gates need different
+        triggers and neither works on the other's. RequirementRecipeHasTags reads a "Tags"
+        metadata entry that only exists on the synthetic ItemValue SCore passes with
+        onSelfCraftedRecipe; ItemHasProperty needs the real crafted item from vanilla's
+        onSelfItemCrafted. So both paths stay, each on the trigger it works on.
+
+        DOUBLE SCORING IS PREVENTED BY THE SHARED COOLDOWN. Both paths test and set
+        buffLBD_craftingFood_ActionCoolDown, which lasts a second. A single craft raises
+        both events at essentially the same moment, so whichever lands first takes the XP
+        and locks the other out. Cooking a stack still scores once per item, as before.
+        Do NOT give this group a cooldown of its own - the sharing is the mechanism.
+    -->
+    <append xpath="/buffs/buff[@name='buffLBD_GeneralManager']">
+        <effect_group name="LBD Crafting Skill - Food (Recipe Tags)">
+
+            <requirement name="RequirementRecipeHasTags, SCore" tags="perkMasterChef"/>
+
+            <triggered_effect trigger="onSelfCraftedRecipe" action="LogMessageCVars, SCore"
+                              message="LBD DEBUG: Crafting Food - Attempting 'Cook' XP (+@$lbd_xp_crafting_base)">
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfCraftedRecipe" action="ModifyCVar"
+                              cvar="$craftingfood_lbd_xp" operation="add" value="@$lbd_xp_crafting_base">
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfCraftedRecipe" action="AddBuff"
+                              buff="buffLBD_craftingFood_ActionCoolDown">
+                <requirement name="NotHasBuff" buff="buffLBD_craftingFood_ActionCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfCraftedRecipe" action="AddBuff"
+                              buff="buffLBD_craftingFood_LevelUpCheck">
+                <requirement name="CVarCompare" cvar="$craftingfood_lbd_xp" operation="GTE"
+                             value="@$craftingfood_lbd_xptonext"/>
+            </triggered_effect>
+
+        </effect_group>
+    </append>
+
+
+    <append xpath="/buffs">
+        <buff name="buffLBD_craftingFood_LevelUpCheck" hidden="true">
+            <stack_type value="ignore"/><duration value="1"/>
+            <effect_group>
+                <requirement name="CanPurchasePerk, SCore" progression_name="craftingFood" />
+                <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Food - Level Up SUCCESS (craftingFood)">
+                    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                </triggered_effect>
+                <triggered_effect trigger="onSelfBuffStart" action="AddProgressionLevel" progression_name="craftingFood" level="1"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$craftingfood_lbd_xp" operation="subtract" value="@$craftingfood_lbd_xptonext"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$craftingfood_lbd_xptonext" operation="multiply" value="@$lbd_xp_crafting_curve_multiplier"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ShowPerkLevelUp, SCore" perk="craftingFood" sound="read_skillbook_final" />
+            </effect_group>
+            <effect_group>
+                <requirement name="!CanPurchasePerk, SCore" progression_name="craftingFood" />
+                <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Food - Level Up FAILED. Perk is locked by requirements.">
+                    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                </triggered_effect>
+            </effect_group>
+        </buff>
+
+        <buff name="buffLBD_craftingFood_ActionCoolDown" hidden="true"><duration value="1"/></buff>
+
+    </append>
+</configs>

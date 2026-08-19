@@ -1,0 +1,389 @@
+﻿<configs>
+
+    <append xpath="/windows">
+        <window name="ingameMenuSCore" anchor="RightTop" pos="-620,-80" width="300" height="200"
+                visible="{# !is_prefab_editor}" controller="SCoreInGameMenu, SCore" cursor_area="true">
+            <grid name="buttons" pos="0, -0" cols="1" width="250" cell_width="250" cell_height="56"
+                  arrangement="vertical" repeat_content="false">
+                <simplebutton name="btnSCoreOptions" depth="3" width="250" height="46" caption_key="xuiSCoreUtilities"
+                              font_size="40"/>
+                <simplebutton name="btnNPCView" depth="3" width="250" height="46" caption_key="xuiSCoreNPCSettings"
+                              font_size="40"/>
+            </grid>
+        </window>
+
+        <!--
+            =====================================================================
+            LOCK PICKING
+            =====================================================================
+
+            The caption shown over the advanced lock picking minigame, opened as its own
+            window group (LockPicking, see xui.xml) from BlockDoorSecurePatch /
+            BlockSecureLootPatch via XUiC_PickLocking.Open.
+
+            [ THIS ONE IS A CAPTION, NOT A DIALOG ]
+            Worth saying plainly, because the temptation is to give it the same full
+            content panel as windowSCoreUtilities and windowSCoreCompanions. It must not
+            have one. SphereLocks instantiates a 3D lock prefab with its own camera
+            (Cam2) and renders it live in the middle of the screen; a boxbg spanning the
+            window would cover the thing the player is trying to look at.
+
+            So the standards are applied to the caption strip only, and the strip is parked
+            at the top of the screen with the centre left clear.
+
+            [ WHY THERE IS NO pause_game ]
+            The other two windows in this file pause. This one must not. The minigame is a
+            live GameObject - Keyhole drives an animator, and CipherControls polls Unity
+            Input directly (arrow keys, space, Q/A/W, Tab) rather than going through XUi.
+            Pausing would freeze the lock the player is picking.
+
+            That same detail is why the full screen collider is harmless here despite the
+            description offering mouse control: XUiC_FullScreenCollider gates XUi view
+            input, and the minigame never asks XUi for any. The two hand-rolled 8000x8000
+            on_press panels it replaces were doing the same job less precisely.
+
+            [ THE BACKDROP STAYS LIGHT ]
+            colour alpha 140, not the 240 the settings windows use. The player has to see
+            the lock through it. This was the alpha the old bgTexture carried and it is
+            deliberate - darkening it to match the other windows would hide the minigame.
+
+            [ GEOMETRY ]
+            900x160 at anchor center, so pos is (-width/2, height/2), then lifted so the
+            strip occupies y +420 down to +260 and nothing of it reaches the lock at
+            centre screen. It was anchor="CenterCenter" panel="Center" on a 1000x500 box
+            with the text nudged +50,-50 inside it, which is why the caption landed below
+            and right of where it reads as belonging.
+
+            Content rect is 900x114 outer, 860x74 after padding="20" - enough for the
+            description to wrap to three lines at font_size 24.
+        -->
+        <window name="windowLockPicking" anchor="center" pos="-450,420" width="900" height="160"
+                cursor_area="true" controller="PickLocking, SCore">
+
+            <!--
+                Input block plus a light dim. Keep the alpha low - see the note above.
+            -->
+            <fullscreencollider name="outclick" color="0,0,0,140" />
+
+            <rect name="header" height="43" depth="1">
+                <headerbg />
+                <label style="header.name" pos="6,-6" width="800" text_key="advancedlockpicking_title" />
+            </rect>
+
+            <rect name="content" pos="0,-46" height="${parentinnerheight-46}" depth="1" padding="20">
+                <boxbg />
+
+                <label name="instructions" depth="2" pos="0,0"
+                       width="${parentinnerwidth}" height="${parentinnerheight}"
+                       font_size="24" justify="center" style="label_outline"
+                       text_key="advancedlockpicking_desc" />
+            </rect>
+        </window>
+
+        <!--
+            =====================================================================
+            SCORE UTILITIES
+            =====================================================================
+
+            The player-facing settings screen, opened as its own window group
+            (SCoreUtilitiesGroup, see xui.xml) from the ESC menu button in ingameMenuSCore
+            above. Every row is a cvar-backed checkbox; Save writes them all to the player
+            and closes the window.
+
+            [ HOW IT IS WIRED ]
+            XUiC_SCoreUtilities does not know any of these rows by name. On open it walks
+            GetChildrenByType<XUiC_ToggleButtonCVar>() and seeds each one, and Save walks
+            the same set writing Buffs.SetCustomVar(CVarName, 0/1). So adding a setting
+            here is a one-line change with no C# to match - the only name the controller
+            looks up is SCorebtnSubmit.
+
+            Two shapes of cvar go through that loop:
+              - a plain player cvar, e.g. quietNPC or $WeaponSway, read by whichever
+                feature owns it
+              - a Class_Feature pair, e.g. AdvancedPrefabFeatures_DisableFlickeringLights.
+                OnOpen splits these on the first underscore and seeds the initial state
+                from Configuration.CheckFeatureStatus(class, feature) when the player has
+                no cvar of that name yet.
+
+            [ CHROME IS VANILLA, AND SELF SIZING ]
+            Structure follows 0-Help Screens, which in turn follows vanilla's own in-game
+            windows: a 43px header rect carrying headerbg plus a header.name label, then a
+            padded content rect carrying boxbg.
+
+            This matters more than it looks. boxbg sizes its border and background from
+            outerwidth/outerheight with ignoreparentpadding, so the frame is derived from
+            the rect it sits in and cannot drift from it. The previous version drew its own
+            sprite at hand-computed coordinates, which meant the numbers had to be redone
+            whenever a row was added, and needed two variants because the Locks block below
+            changes the content height. None of that arithmetic survives here.
+
+            fullscreencollider is the same story: one vanilla template replacing a pair of
+            hand-rolled 8000x8000 panels. It supplies the input block and the dimmed
+            backdrop, and XUiC_FullScreenCollider tracks visible instances so IsBlocked
+            works properly rather than relying on a bare on_press catcher. Vanilla spells
+            it exactly this way, name and all, at XUi_InGame/windows.xml:5697.
+
+            [ GEOMETRY ]
+            400x780 at anchor center, so pos is (-width/2, height/2) - the convention every
+            centred vanilla window uses, and what the old pos="0,400" on a 1185 wide window
+            got wrong. Being off centre is why the old content panel needed pivot="center"
+            and a grid parked at x -145 to look right; centre the window properly and the
+            content sits at its natural 0,0.
+
+            Content rect is 400x734 outer, 360x694 after padding="20".
+              grid   18 cells at 34px           = 612 tall, from y 0
+              save   right and bottom aligned   = pos (360-200, -(694-46))
+            The 36px between them is slack, and the four cells the Locks block adds are
+            already counted - this is the maximum the window holds. Adding a section means
+            a spacer and a heading, so budget 68px for one, not 34.
+
+            [ GRID LAYOUT ]
+            The grid is one column and every child is one cell, so the bare <rect/> entries
+            are deliberate blank spacers before each section heading, not leftovers. Keep a
+            spacer and a heading together when adding a section.
+
+            [ TOGGLE GEOMETRY ]
+            Size, depth and font live on the togglebuttonCVar template defaults, since this
+            window is its only consumer. Rows carry just what makes them different: name,
+            cvar and captions. The template comment records the attributes that used to be
+            repeated here and never had any effect.
+        -->
+        <window name="windowSCoreUtilities" anchor="center" pos="-200,390" width="400" height="780"
+                cursor_area="true" pause_game="true" controller="SCoreUtilities, SCore">
+
+            <!-- Input block and dimmed backdrop, so nothing behind the dialog stays live. -->
+            <fullscreencollider name="outclick" color="0,0,0,240" />
+
+            <rect name="header" height="43" depth="1">
+                <headerbg />
+                <label style="header.name" pos="6,-6" width="380" text_key="xuiSCoreUtilities" />
+            </rect>
+
+            <rect name="content" pos="0,-46" height="${parentinnerheight-46}" depth="1" padding="20">
+                <boxbg />
+
+                <grid name="toggle01" depth="2" pos="0,0" cols="1" width="320" cell_width="290"
+                      cell_height="34" arrangement="vertical" repeat_content="false">
+
+                    <!-- Lock picking, only when the Locks modlet supplies the feature. -->
+                    <conditional evaluator="client">
+                        <if cond="mod_loaded('Locks')">
+                            <rect/>
+                            <label style="label_outline, header.name" text="Lock Pick Settings"
+                                   text_key="xuiLockPickingSettings" width="320" height="26" font_size="24"/>
+                            <togglebuttonCVar name="toggleLockPick" cvar="LegacyLockPick"
+                                              caption_key="xuiLockPicking"
+                                              tooltip_key="xuiLockPickingToolTip"/>
+                            <togglebuttonCVar name="toggleForceMiniGameLockPick" cvar="MiniGameLockPick"
+                                              caption_key="xuiSCoreUtilsMiniGameLockPick"
+                                              tooltip_key="xuiSCoreUtilsMiniGameLockPickToolTip"/>
+                        </if>
+                    </conditional>
+
+                    <rect/>
+                    <label style="label_outline, header.name" text="NPC Settings" text_key="xuiNPCSettings"
+                           width="320" height="26" font_size="24"/>
+                    <togglebuttonCVar name="toggleNPCFootsteps" cvar="quietNPC"
+                                      caption_key="xuiQuietNPC"
+                                      tooltip_key="xuiQuietNPCToolTip"/>
+
+                    <rect/>
+                    <label style="label_outline, header.name" text="Trader Settings" text_key="xuiTraderSettings"
+                           width="320" height="26" font_size="24"/>
+                    <togglebuttonCVar name="toggleMuteTraderRekt" cvar="MuteTraderRekt"
+                                      caption_key="xuiSCoreUtilsTraderRekt"
+                                      tooltip_key="xuiSCoreUtilsTraderRektToolTip"/>
+                    <togglebuttonCVar name="toggleMuteTraderAll" cvar="MuteTraderAll"
+                                      caption_key="xuiSCoreUtilsTraderAll"
+                                      tooltip_key="xuiSCoreUtilsTraderAllToolTip"/>
+
+                    <rect/>
+                    <label style="label_outline, header.name" text="Personal Settings"
+                           text_key="xuiPersonalSettings" width="320" height="26" font_size="24"/>
+                    <togglebuttonCVar name="toggleDisableFlickeringLights"
+                                      cvar="AdvancedPrefabFeatures_DisableFlickeringLights"
+                                      caption_key="xuiSCoreUtilsDisableFlickeringLights"
+                                      tooltip_key="xuiSCoreUtilsDisableFlickeringLightsToolTip"/>
+                    <togglebuttonCVar name="toggleAutoRedeemChallenges"
+                                      cvar="AdvancedPlayerFeatures_AutoRedeemChallenges"
+                                      caption_key="xuiSCoreUtilsAutoRedeemChallenges"
+                                      tooltip_key="xuiSCoreUtilsAutoRedeemChallengesToolTip"/>
+
+                    <!--
+                        The $ is load bearing. SwayUtilities.CanSway and the weaponsway
+                        console command both read $WeaponSway, and XUiC_SCoreUtilities
+                        writes CVarName through verbatim, so the name here has to match
+                        character for character. Checked means suppressed, matching both
+                        the caption and the value CanSway tests for.
+                    -->
+                    <togglebuttonCVar name="toggleWeaponSway"
+                                      cvar="$WeaponSway"
+                                      caption_key="xuiSCoreUtilsWeaponSway"
+                                      tooltip_key="xuiSCoreUtilsWeaponSwayToolTip"/>
+
+                    <togglebuttonCVar name="toggleMemoryBudget"
+                                      cvar="$SCoreUtils_MemoryBudget"
+                                      caption_key="xuiSCoreUtilsMemoryBudget"
+                                      tooltip_key="xuiSCoreUtilsMemoryBudgetToolTip"/>
+                    <togglebuttonCVar name="togglePPEnable"
+                                      cvar="$SCoreUtils_PPEnable"
+                                      caption_key="xuiSCoreUtilsPPEnable"
+                                      tooltip_key="xuiSCoreUtilsPPEnableToolTip"/>
+                </grid>
+
+                <!--
+                    Save. A sibling of the grid rather than its last cell, the way
+                    0-Help Screens hangs btnClose off its content rect: it belongs to the
+                    window, not to the list of settings, and keeping it out of the grid is
+                    what lets it sit bottom right instead of needing a -80 nudge inside a
+                    34px cell. XUiC_SCoreUtilities.Init finds it by name.
+                -->
+                <simplebutton name="SCorebtnSubmit" depth="3" pos="160,-648" width="200" height="46"
+                              font_size="34" caption_key="xuiSave" upper_case="true" />
+            </rect>
+        </window>
+
+
+        <!--
+            =====================================================================
+            SCORE COMPANIONS
+            =====================================================================
+
+            The hired NPC roster, opened as its own window group (SCoreCompanionsGroup,
+            see xui.xml). One row per companion, each with Follow / Stay Here / Stay There
+            / Teleport / Dismiss, plus the quiet footsteps toggle.
+
+            [ WHAT THE CONTROLLER REQUIRES ]
+            XUiC_SCoreCompanionList.Init does two lookups, and both are contracts:
+
+              GetChildrenByType<XUiC_SCoreCompanion>()  every row the grid stamps out.
+                                                        The controller hides them all, then
+                                                        RefreshCompanions shows one per
+                                                        hired NPC, so the grid must supply
+                                                        at least as many rows as a player
+                                                        can have companions - surplus rows
+                                                        are free, they stay hidden.
+              GetChildById("toggleNPCFootsteps")        then .GetChildByType<XUiC_ToggleButton>().
+                                                        GetChildByType matches self first,
+                                                        so the togglebutton instantiation
+                                                        carrying that name satisfies it
+                                                        directly. Rename it and Init throws.
+
+            This one stays a vanilla togglebutton rather than the togglebuttonCVar used in
+            windowSCoreUtilities: the controller wires OnValueChanged itself and writes
+            quietNPC on the spot, with no Save button to batch it. Same cvar, applied
+            immediately instead of on submit.
+
+            [ CHROME IS VANILLA, AND SELF SIZING ]
+            Same shape as windowSCoreUtilities and 0-Help Screens: a 43px header rect with
+            headerbg, then a padded content rect with boxbg. The header previously carried
+            an icon and a label but no headerbg, so it had no background to sit on.
+
+            [ GEOMETRY ]
+            940x840 at anchor center, so pos is (-width/2, height/2). It was panel="Center"
+            before, which docks into the shared centre panel used by the backpack layout -
+            reasonable for a looting window, but this opens standalone as its own group, so
+            it places itself the way every other centred window does.
+
+            The width is chosen backwards from the content, not picked: score_companion_header
+            and score_companion_entry2 are both 900 wide, and the list grid uses
+            cell_width="900", so the padded inner area has to be exactly 900. 900 + 2*20
+            padding = 940.
+
+            Content rect is 940x794 outer, 900x754 after padding="20". Stacked from y 0:
+              heading      26        NPC Settings
+              toggle       32 at -30
+              headings     52 at -74   score_companion_header
+              list      13*46 at -128  = 598, ending at -726
+            leaving 28px at the bottom. Rows come out of that budget at 46px each.
+        -->
+        <window name="windowSCoreCompanions" anchor="center" pos="-470,420" width="940" height="840"
+                cursor_area="true" pause_game="true" controller="SCoreCompanionList, SCore">
+
+            <!-- Input block and dimmed backdrop, so nothing behind the dialog stays live. -->
+            <fullscreencollider name="outclick" color="0,0,0,240" />
+
+            <rect name="header" height="43" depth="1">
+                <headerbg />
+                <sprite depth="1" name="windowIcon" style="icon32px" pos="4,-5" sprite="ui_game_symbol_players" />
+                <label style="header.name" pos="42,-6" width="500" text_key="xuiSCoreCompanions" />
+            </rect>
+
+            <rect name="content" pos="0,-46" height="${parentinnerheight-46}" depth="1" padding="20">
+                <boxbg />
+
+                <label style="label_outline, header.name" pos="0,0" width="320" height="26"
+                       font_size="24" text="NPC Settings" text_key="xuiSCoreNPCSettings" />
+
+                <!-- Name is the controller's contract - see the header comment. -->
+                <togglebutton name="toggleNPCFootsteps" depth="3" pos="0,-30" width="290" height="32"
+                              font_size="24" caption_key="xuiScoreUtilsNPCFootStep"
+                              tooltip_key="xuiQuietNPCToolTip" />
+
+                <score_companion_header pos="0,-74" />
+
+                <grid name="companionList" depth="2" pos="0,-128" rows="13" cols="1"
+                      width="900" height="598" cell_width="900" cell_height="46"
+                      repeat_content="true" arrangement="vertical">
+                    <score_companion_entry2 name="0"/>
+                </grid>
+            </rect>
+        </window>
+
+
+        <window name="windowFuelPoweredSDX" width="228" height="166" panel="Right" cursor_area="true">
+            <panel style="header.panel">
+                <sprite style="header.icon" sprite="ui_game_symbol_fire"/>
+                <label style="header.name.iconright" text="Power" text_key="xuiNeedPower" />
+                <label style="header.timer"/>
+            </panel>
+
+            <rect name="content" depth="0" pos="0,1" height="1" >
+                <rect disablefallthrough="true">
+                    <grid rows="1" cols="3" pos="3,-3" cell_width="75" cell_height="1" controller="WorkstationFuelGridSDX, SCore" repeat_content="true">
+                    </grid>
+                </rect>
+            </rect>
+            <panel name="buttonContent" depth="5" pos="0, -46" height="40" backgroundcolor="[black]" bordercolor="[black]">
+                <sprite depth="5" name="backgroundMain" sprite="menu_empty3px" color="[black]" type="sliced" fillcenter="false" />
+                <rect depth="1" pos="3,-3" width="225" height="34">
+                    <button name="button" sprite="menu_empty" defaultcolor="[mediumGrey]" disabledcolor="[mediumGrey]" hoversprite="ui_game_select_row" hovercolor="[white]" type="sliced" width="222"  hoverscale="1.0" />
+                    <sprite depth="2" name="flameIcon" style="icon32px" pos="5,0" sprite="ui_game_symbol_fire" />
+                    <label depth="2" name="onoff" pos="0,-6" justify="center" text="TURN ON" text_key="xuiTurnOn" font_size="26" />
+                </rect>
+            </panel>
+        </window>
+
+        <!-- Hire confirmation popup — opened by DialogActionOpenDialogSDX and PhraseTriggerHandler.Hire -->
+        <window name="windowHireInformationPopup" depth="99" width="400" height="160"
+                pos="-200,0" anchor="CenterCenter" cursor_area="true"
+                controller="XUiC_HireInformationPopupSDX, SCore">
+            <panel name="HireInformationPopup" depth="3" pos="0,0" width="400" height="160">
+                <sprite depth="1" name="bg" sprite="menu_empty" type="sliced" color="0,0,0,220"
+                        pos="0,0" width="400" height="160"/>
+                <label depth="5" name="HireInformationLabel" pos="20,-15" width="360" height="80"
+                       text="Hire NPC?" font_size="18" justify="center" style="label_outline"
+                       max_line_count="2"/>
+                <simplebutton depth="5" name="btnConfirm" pos="60,-110" width="110" height="36"
+                              caption="Hire" font_size="16"/>
+                <simplebutton depth="5" name="btnCancel" pos="230,-110" width="110" height="36"
+                              caption="Cancel" font_size="16"/>
+            </panel>
+        </window>
+    </append>
+
+    <append xpath="/windows/window[@name='windowLooting']//rect[@controller='ContainerStandardControls']">
+        <button depth="3" name="btnBroadcast"
+                sprite="ui_game_symbol_bc"
+                tooltip_key="xuiPinGrab"
+                pos="114, -22" pivot="center"
+                style="icon32px, press, hover"
+                visible="{broadcastManager}"
+                defaultcolor="[white]"
+                selectedcolor="[disabledColor]"
+                sound="[paging_click]"
+                controller="BroadcastButton, SCore"/>
+    </append>
+
+
+</configs>

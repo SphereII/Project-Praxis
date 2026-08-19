@@ -1,0 +1,96 @@
+<configs>
+    <append xpath="/buffs/buff[@name='buffLBD_IntellectManager']">
+        <effect_group name="Robotic Turrets">
+            
+            <!-- Placed Turrets -->
+            <triggered_effect trigger="onSelfTurretDamagedOther" action="LogMessageCVars, SCore" message="LBD DEBUG: Robotic Turrets - Attempting Turret Damage XP (+@$lbd_xp_ranged_base)">
+                <requirement name="IsAlive" target="other"/>
+                <requirement name="NotHasBuff" buff="buffLBD_perkTurrets_XPCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfTurretDamagedOther" action="ModifyCVar" cvar="$perkturrets_lbd_xp" operation="add" value="@$lbd_xp_ranged_base">
+                <requirement name="IsAlive" target="other"/>
+                <requirement name="NotHasBuff" buff="buffLBD_perkTurrets_XPCoolDown"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfTurretKilledOther" action="LogMessageCVars, SCore" message="LBD DEBUG: Robotic Turrets - Attempting Turret Kill Bonus XP (+@$lbd_xp_special_base)">
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfTurretKilledOther" action="ModifyCVar" cvar="$perkturrets_lbd_xp" operation="add" value="@$lbd_xp_special_base" />
+
+            <!-- Holding Turrets -->
+            <triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: Robotic Turrets - Turret and Sledge combo effect triggered">
+                <requirement name="HoldingItemHasTags" tags="perkTurrets"/>
+                <requirement name="IsAlive" target="other"/>
+                <requirement name="NotHasBuff" buff="buffLBD_perkTurrets_XPCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfPrimaryActionRayHit" action="ModifyCVar" cvar="$perkturrets_lbd_xp" operation="add" value="@$lbd_xp_melee_base">
+                <requirement name="HoldingItemHasTags" tags="perkTurrets"/>
+                <requirement name="IsAlive" target="other"/>
+                <requirement name="NotHasBuff" buff="buffLBD_perkTurrets_XPCoolDown"/>
+            </triggered_effect>
+
+            <!-- Placed Turret Cool Down -->
+            <triggered_effect trigger="onSelfTurretDamagedOther" action="LogMessageCVars, SCore" message="LBD DEBUG: Robotic Turrets - Applying Cooldown (Damage)">
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfTurretDamagedOther" action="AddBuff" buff="buffLBD_perkTurrets_XPCoolDown" />
+            <triggered_effect trigger="onSelfTurretKilledOther" action="LogMessageCVars, SCore" message="LBD DEBUG: Robotic Turrets - Applying Cooldown (Kill)">
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfTurretKilledOther" action="AddBuff" buff="buffLBD_perkTurrets_XPCoolDown" />
+
+            <!-- Holding Turret Cooldown -->
+            <triggered_effect trigger="onSelfPrimaryActionRayHit" action="AddBuff" buff="buffLBD_perkTurrets_XPCoolDown">
+                <requirement name="HoldingItemHasTags" tags="perkTurrets"/>
+            </triggered_effect>
+            
+            <!-- Placed Turret Level up check -->
+            <triggered_effect trigger="onSelfTurretDamagedOther" action="LogMessageCVars, SCore" message="LBD DEBUG: Robotic Turrets - Triggering Level Up Check (from Damage)">
+                <requirement name="CVarCompare" cvar="$perkturrets_lbd_xp" operation="GTE" value="@$perkturrets_lbd_xptonext"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfTurretDamagedOther" action="AddBuff" buff="buffLBD_perkTurrets_LevelUpCheck">
+                <requirement name="CVarCompare" cvar="$perkturrets_lbd_xp" operation="GTE" value="@$perkturrets_lbd_xptonext"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfTurretKilledOther" action="LogMessageCVars, SCore" message="LBD DEBUG: Robotic Turrets - Triggering Level Up Check (from Kill)">
+                <requirement name="CVarCompare" cvar="$perkturrets_lbd_xp" operation="GTE" value="@$perkturrets_lbd_xptonext"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfTurretKilledOther" action="AddBuff" buff="buffLBD_perkTurrets_LevelUpCheck">
+                <requirement name="CVarCompare" cvar="$perkturrets_lbd_xp" operation="GTE" value="@$perkturrets_lbd_xptonext"/>
+            </triggered_effect>
+
+            <!-- Holding Turret cool down -->
+            <triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: Robotic Turrets - Triggering Level Up Check (from Sledge)">
+                <requirement name="CVarCompare" cvar="$perkturrets_lbd_xp" operation="GTE" value="@$perkturrets_lbd_xptonext"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfPrimaryActionRayHit" action="AddBuff" buff="buffLBD_perkTurrets_LevelUpCheck">
+                <requirement name="CVarCompare" cvar="$perkturrets_lbd_xp" operation="GTE" value="@$perkturrets_lbd_xptonext"/>
+            </triggered_effect>
+
+        </effect_group>
+    </append>
+    <append xpath="/buffs">
+        <buff name="buffLBD_perkTurrets_LevelUpCheck" hidden="true">
+            <stack_type value="ignore"/><duration value="1"/>
+            <effect_group>
+                <requirement name="CanPurchasePerk, SCore" progression_name="perkTurrets" />
+                <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Robotic Turrets - Level Up SUCCESS (perkTurrets)">
+                    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                </triggered_effect>
+                <triggered_effect trigger="onSelfBuffStart" action="AddProgressionLevel" progression_name="perkTurrets" level="1"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkturrets_lbd_xp" operation="subtract" value="@$perkturrets_lbd_xptonext"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkturrets_lbd_xptonext" operation="multiply" value="@$lbd_xp_curve_multiplier"/>
+                <triggered_effect trigger="onSelfBuffStart" action="ShowToolbeltMessage" message_key="perkTurretsLeveledUp"/>
+            </effect_group>
+            <effect_group>
+                <requirement name="!CanPurchasePerk, SCore" progression_name="perkTurrets" />
+                <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Robotic Turrets - Level Up FAILED. Perk is locked by requirements.">
+                    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                </triggered_effect>
+            </effect_group>
+        </buff>
+    </append>
+</configs>

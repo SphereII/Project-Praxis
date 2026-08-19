@@ -1,0 +1,346 @@
+<configs>
+    <append xpath="/buffs/buff[@name='buffLBD_StrengthManager']">
+        <effect_group name="LBD Crafting Skill - Harvesting Tools">
+            <triggered_effect trigger="onSelfItemCrafted" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Harvesting Tools - Attempting 'Craft' XP (+@$lbd_xp_crafting_base)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                <requirement name="!RequirementCraftedItemMatchesCVar, SCore" cvar="$craftingharvestingtools_lbd_lastitem"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemCrafted" action="ModifyCVar" cvar="$craftingharvestingtools_lbd_xp" operation="add" value="@$lbd_xp_crafting_base">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown"/>
+                <requirement name="!RequirementCraftedItemMatchesCVar, SCore" cvar="$craftingharvestingtools_lbd_lastitem"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfScrapItem" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Harvesting Tools - Attempting 'Scrap' XP (+@$lbd_xp_scrapping_base)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfScrapItem" action="ModifyCVar" cvar="$craftingharvestingtools_lbd_xp" operation="add" value="@$lbd_xp_scrapping_base">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfItemRepaired" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Harvesting Tools - Attempting 'Repair' XP (+@$lbd_xp_repairing_base)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemRepaired" action="ModifyCVar" cvar="$craftingharvestingtools_lbd_xp" operation="add" value="@$lbd_xp_repairing_base">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfItemRepaired" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Harvesting Tools - Attempting T0 Repair XP (+@$lbd_xp_repairing_base)">
+                <requirement name="ProgressionLevel" progression_name="craftingHarvestingTools" operation="LTE" value="10"/>
+                <requirement name="ItemHasTags" tags="T0"/>
+                <requirement name="ItemHasTags" tags="harvestingSkill"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_T0RepairCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemRepaired" action="ModifyCVar" cvar="$craftingharvestingtools_lbd_xp" operation="add" value="@$lbd_xp_repairing_base">
+                <requirement name="ProgressionLevel" progression_name="craftingHarvestingTools" operation="LTE" value="10"/>
+                <requirement name="ItemHasTags" tags="T0"/>
+                <requirement name="ItemHasTags" tags="harvestingSkill"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_T0RepairCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfItemCrafted" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Harvesting Tools - Applying Cooldown (Craft)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemCrafted" action="AddBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfScrapItem" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Harvesting Tools - Applying Cooldown (Scrap)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfScrapItem" action="AddBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfItemRepaired" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Harvesting Tools - Applying Cooldown (Repair)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemRepaired" action="AddBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_ActionCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfItemRepaired" action="AddBuff" buff="buffLBD_craftingHarvestingTools_T0RepairCoolDown">
+                <requirement name="ProgressionLevel" progression_name="craftingHarvestingTools" operation="LTE" value="10"/>
+                <requirement name="ItemHasTags" tags="T0"/>
+                <requirement name="ItemHasTags" tags="harvestingSkill"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_T0RepairCoolDown"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfItemCrafted" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Harvesting Tools - Triggering Level Up Check (Craft)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemCrafted" action="AddBuff" buff="buffLBD_craftingHarvestingTools_LevelUpCheck">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfScrapItem" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Harvesting Tools - Triggering Level Up Check (Scrap)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfScrapItem" action="AddBuff" buff="buffLBD_craftingHarvestingTools_LevelUpCheck">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfItemRepaired" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Harvesting Tools - Triggering Level Up Check (Repair)">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemRepaired" action="AddBuff" buff="buffLBD_craftingHarvestingTools_LevelUpCheck">
+                <requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+            </triggered_effect>
+
+            <triggered_effect trigger="onSelfItemRepaired" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Harvesting Tools - Triggering Level Up Check (T0 Repair)">
+                <requirement name="ProgressionLevel" progression_name="craftingHarvestingTools" operation="LTE" value="10"/>
+                <requirement name="ItemHasTags" tags="T0"/>
+                <requirement name="ItemHasTags" tags="harvestingSkill"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemRepaired" action="AddBuff" buff="buffLBD_craftingHarvestingTools_LevelUpCheck">
+                <requirement name="ProgressionLevel" progression_name="craftingHarvestingTools" operation="LTE" value="10"/>
+                <requirement name="ItemHasTags" tags="T0"/>
+                <requirement name="ItemHasTags" tags="harvestingSkill"/>
+                <requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+                <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+            </triggered_effect>
+
+            <!-- T0 starter gear. These items carry no UnlockedBy property, so the paths
+                 above cannot see them, and below level 11 there is nothing else craftable -
+                 vanilla unlocks the T1 recipes for this skill at 11. Pays until then and
+                 stops, letting the UnlockedBy paths take over. Scrap is deliberately not
+                 included: craft-then-scrap would loop for double XP. -->
+            <triggered_effect trigger="onSelfItemCrafted" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Harvesting Tools - Attempting T0 Craft XP (+@$lbd_xp_crafting_base)">
+                <requirement name="ProgressionLevel" progression_name="craftingHarvestingTools" operation="LTE" value="10"/>
+                <requirement name="ItemHasTags" tags="T0"/>
+                <requirement name="ItemHasTags" tags="harvestingSkill"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_T0RepairCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                <requirement name="!RequirementCraftedItemMatchesCVar, SCore" cvar="$craftingharvestingtools_lbd_lastitem"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemCrafted" action="ModifyCVar" cvar="$craftingharvestingtools_lbd_xp" operation="add" value="@$lbd_xp_crafting_base">
+                <requirement name="ProgressionLevel" progression_name="craftingHarvestingTools" operation="LTE" value="10"/>
+                <requirement name="ItemHasTags" tags="T0"/>
+                <requirement name="ItemHasTags" tags="harvestingSkill"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_T0RepairCoolDown"/>
+                <requirement name="!RequirementCraftedItemMatchesCVar, SCore" cvar="$craftingharvestingtools_lbd_lastitem"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemCrafted" action="AddBuff" buff="buffLBD_craftingHarvestingTools_T0RepairCoolDown">
+                <requirement name="ProgressionLevel" progression_name="craftingHarvestingTools" operation="LTE" value="10"/>
+                <requirement name="ItemHasTags" tags="T0"/>
+                <requirement name="ItemHasTags" tags="harvestingSkill"/>
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_T0RepairCoolDown"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemCrafted" action="LogMessageCVars, SCore" message="LBD DEBUG: Crafting Harvesting Tools - Triggering Level Up Check (T0 Craft)">
+                <requirement name="ProgressionLevel" progression_name="craftingHarvestingTools" operation="LTE" value="10"/>
+                <requirement name="ItemHasTags" tags="T0"/>
+                <requirement name="ItemHasTags" tags="harvestingSkill"/>
+                <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfItemCrafted" action="AddBuff" buff="buffLBD_craftingHarvestingTools_LevelUpCheck">
+                <requirement name="ProgressionLevel" progression_name="craftingHarvestingTools" operation="LTE" value="10"/>
+                <requirement name="ItemHasTags" tags="T0"/>
+                <requirement name="ItemHasTags" tags="harvestingSkill"/>
+                <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+            </triggered_effect>
+
+            <!-- Remember what was just crafted. Ordered last so the awards above
+                 compare against the PREVIOUS craft, not this one. A queue of twenty
+                 identical items now scores once; twenty different items score twenty
+                 times. A cooldown cannot make that distinction - when an item takes
+                 longer to craft than the cooldown lasts, every craft in the queue
+                 scores regardless. -->
+            <triggered_effect trigger="onSelfItemCrafted" action="SetCVarFromItemType, SCore" cvar="$craftingharvestingtools_lbd_lastitem"/>
+
+        </effect_group>
+    </append>
+
+    <!--
+        =====================================================================
+        LEARNING BY USING
+        =====================================================================
+
+        Every other path in this file pays for making, mending or breaking down a harvest
+        tool. This one pays for swinging it. You learn what a tool is good for by working
+        with it, and a player who spends a day clearing trees should end that day better
+        at harvest tools than one who spent it crafting nothing.
+
+        It also closes a real gap. A logged session destroyed 82 blocks - trees, shrubs,
+        stumps, rock - and craftingHarvestingTools earned exactly 1 XP for the lot,
+        because none of it was a craft, a scrap or a repair.
+
+        [ THE TWO GATES ]
+        HoldingItemHasTags harvestingSkill - the vanilla tag every one of the eleven items
+        this skill unlocks carries: both axes, the pickaxes, the shovels, the chainsaw and
+        the auger. It is the tag that means "this is a harvest tool", so a stone axe used
+        as a weapon still counts, but a club never does.
+
+        RequirementBlockHasHarvestTags allHarvest,oreWoodHarvest - the block has to be
+        something you could actually harvest. That requirement does not read a property
+        off the block; it walks the block's Harvest drops and tests each drop's tag, so
+        these two names are drop tags rather than block tags. The pair is the union Miner
+        69'r already uses: allHarvest covers general harvestables, oreWoodHarvest covers
+        wood and ore. Swinging at a wall or a zombie trains nothing.
+
+        [ THE RATE ]
+        One XP per swing that lands, then a 15 second lockout - not per swing, or a
+        chainsaw would outpace every other source in the file combined. Fifteen seconds
+        of steady work per XP means roughly five minutes of solid harvesting for level 1
+        at the base threshold of 20, and about an hour of it to reach level 10 (240 XP
+        cumulative on the 1.04 curve).
+
+        Tune it with $lbd_xp_crafting_use_base for the amount, or the duration on
+        buffLBD_craftingHarvestingTools_UseCoolDown for the pace. The cooldown is the
+        blunter of the two and the one to reach for first.
+    -->
+    <append xpath="/buffs/buff[@name='buffLBD_StrengthManager']">
+        <effect_group name="LBD Crafting Skill - Harvesting Tools (Use)">
+
+            <requirement name="HoldingItemHasTags" tags="harvestingSkill"/>
+            <requirement name="RequirementBlockHasHarvestTags, SCore" tags="allHarvest,oreWoodHarvest"/>
+
+            <!-- Ordinary swing. -->
+            <triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore"
+                              message="LBD DEBUG: Crafting Harvesting Tools - Attempting 'Use' XP (+@$lbd_xp_crafting_use_base)">
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_UseCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfPrimaryActionRayHit" action="ModifyCVar"
+                              cvar="$craftingharvestingtools_lbd_xp" operation="add" value="@$lbd_xp_crafting_use_base">
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_UseCoolDown"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfPrimaryActionRayHit" action="AddBuff"
+                              buff="buffLBD_craftingHarvestingTools_UseCoolDown">
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_UseCoolDown"/>
+            </triggered_effect>
+
+            <!-- Power swing. Same value and the SAME cooldown, deliberately: this is about
+                 time spent with the tool, not about which mouse button did it. -->
+            <triggered_effect trigger="onSelfSecondaryActionRayHit" action="LogMessageCVars, SCore"
+                              message="LBD DEBUG: Crafting Harvesting Tools - Attempting 'Use' XP (+@$lbd_xp_crafting_use_base)">
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_UseCoolDown"/>
+                <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfSecondaryActionRayHit" action="ModifyCVar"
+                              cvar="$craftingharvestingtools_lbd_xp" operation="add" value="@$lbd_xp_crafting_use_base">
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_UseCoolDown"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfSecondaryActionRayHit" action="AddBuff"
+                              buff="buffLBD_craftingHarvestingTools_UseCoolDown">
+                <requirement name="NotHasBuff" buff="buffLBD_craftingHarvestingTools_UseCoolDown"/>
+            </triggered_effect>
+
+            <!-- Hand off to the shared level up check, which owns the Strength gate above
+                 level 5 and the curve multiply. Both swings, so a level never waits for
+                 the next craft. -->
+            <triggered_effect trigger="onSelfPrimaryActionRayHit" action="AddBuff"
+                              buff="buffLBD_craftingHarvestingTools_LevelUpCheck">
+                <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE"
+                             value="@$craftingharvestingtools_lbd_xptonext"/>
+            </triggered_effect>
+            <triggered_effect trigger="onSelfSecondaryActionRayHit" action="AddBuff"
+                              buff="buffLBD_craftingHarvestingTools_LevelUpCheck">
+                <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE"
+                             value="@$craftingharvestingtools_lbd_xptonext"/>
+            </triggered_effect>
+
+        </effect_group>
+    </append>
+
+
+        <append xpath="/buffs">
+            <buff name="buffLBD_craftingHarvestingTools_LevelUpCheck" hidden="true">
+                <stack_type value="ignore"/><duration value="1"/>
+                <!-- Level 5 and up: the Strength gate the failure message below describes.
+                     This group runs BEFORE the early one on purpose. Requirements are checked
+                     against live progression, so if the early group ran first a level 4 -> 5
+                     step would immediately satisfy this one and grant a second level. -->
+                <effect_group>
+                    <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+                    <requirement name="ProgressionLevel" progression_name="craftingHarvestingTools" operation="GTE" value="5"/>
+                    <requirement name="ProgressionLevel" progression_name="attStrength" operation="GTE" value="2"/>
+                    <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Harvesting Tools - Level Up SUCCESS (craftingHarvestingTools)">
+                        <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                    </triggered_effect>
+                    <triggered_effect trigger="onSelfBuffStart" action="AddProgressionLevel" progression_name="craftingHarvestingTools" level="1"/>
+                    <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$craftingharvestingtools_lbd_xp" operation="subtract" value="@$craftingharvestingtools_lbd_xptonext"/>
+                    <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$craftingharvestingtools_lbd_xptonext" operation="multiply" value="@$lbd_xp_crafting_curve_multiplier"/>
+                    <triggered_effect trigger="onSelfBuffStart" action="ShowPerkLevelUp, SCore" perk="craftingHarvestingTools" sound="read_skillbook_final" />
+                </effect_group>
+                <!-- Below level 5: no attribute investment required. Attributes start at 1,
+                     so gating these first levels on Strength 2 locked the skill out of a new
+                     character entirely and made the T0 repair path unreachable. -->
+                <effect_group>
+                    <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+                    <requirement name="ProgressionLevel" progression_name="craftingHarvestingTools" operation="LT" value="5"/>
+                    <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Harvesting Tools - Level Up SUCCESS (craftingHarvestingTools)">
+                        <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                    </triggered_effect>
+                    <triggered_effect trigger="onSelfBuffStart" action="AddProgressionLevel" progression_name="craftingHarvestingTools" level="1"/>
+                    <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$craftingharvestingtools_lbd_xp" operation="subtract" value="@$craftingharvestingtools_lbd_xptonext"/>
+                    <triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$craftingharvestingtools_lbd_xptonext" operation="multiply" value="@$lbd_xp_crafting_curve_multiplier"/>
+                    <triggered_effect trigger="onSelfBuffStart" action="ShowPerkLevelUp, SCore" perk="craftingHarvestingTools" sound="read_skillbook_final" />
+                </effect_group>
+                <effect_group>
+                    <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+                    <requirement name="ProgressionLevel" progression_name="craftingHarvestingTools" operation="GTE" value="5"/>
+                    <requirement name="ProgressionLevel" progression_name="attStrength" operation="LT" value="2"/> <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Harvesting Tools - Level Up FAILED. Need higher Strength to advance beyond level 5.">
+                    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                </triggered_effect>
+                </effect_group>
+                <effect_group>
+                    <requirement name="CVarCompare" cvar="$craftingharvestingtools_lbd_xp" operation="GTE" value="@$craftingharvestingtools_lbd_xptonext"/>
+                    <requirement name="!CanPurchasePerk, SCore" progression_name="craftingHarvestingTools" />
+                    <triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Harvesting Tools - Level Up FAILED. Perk is locked by requirements.">
+                        <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+                    </triggered_effect>
+                </effect_group>
+            </buff>
+
+            <!-- Throttles for the effect group above. Both were referenced but never
+                 defined, so NotHasBuff was always true and every craft, scrap and repair
+                 scored. Durations match the other crafting skills. -->
+            <buff name="buffLBD_craftingHarvestingTools_ActionCoolDown" hidden="true"><duration value="1"/></buff>
+            <!-- Separate from ActionCoolDown, and far longer. That one exists to stop a single
+                 craft double-scoring and only needs a second; this one is the throttle on
+                 learning by use, where the raw event fires several times a second. -->
+            <buff name="buffLBD_craftingHarvestingTools_UseCoolDown" hidden="true"><duration value="15"/></buff>
+            <buff name="buffLBD_craftingHarvestingTools_T0RepairCoolDown" hidden="true"><duration value="5"/></buff>
+        </append>
+
+</configs>

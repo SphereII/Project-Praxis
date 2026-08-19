@@ -1,0 +1,118 @@
+<configs>
+
+    <!--
+        This was XUi_InGame/controls.xml appending to /controls. The game no longer ships
+        that file, so nothing in it was being loaded. Custom controls are now templates:
+        same markup, appended to /templates in XUi_InGame/templates.xml instead.
+
+        Consumers are unchanged - XUi_InGame/windows.xml instantiates these by tag name
+        (score_companion_header, score_companion_entry2, togglebuttonCVar).
+    -->
+    <append xpath="/templates">
+        <score_companion_entry2>
+            <rect depth="1" width="900" height="43" pos="-3,-6" disabled_color="[disabledLabelColor]"
+                  alternating_color="[darkestGrey]" controller="SCoreCompanion, SCore">
+                <sprite depth="10" name="backgroundMain" sprite="menu_empty3px" pos="3,3" width="900" height="49" color="[black]" type="sliced" fillcenter="false"/>
+                <sprite name="background" color="[darkGrey]" height="46" width="900" pos="4,2" type="sliced"/>
+
+                <rect depth="1" name="npcName" width="154" height="46" pos="6,-6">
+                    <label depth="1" name="TextContent" pos="4, -15" width="136" height="38" text="{name}" font_size="26" pivot="left"/>
+                </rect>
+                <rect depth="1" name="currentOrder" width="70" height="46" pos="160,-6">
+                    <label depth="1" name="TextContent" pos="4, -15" width="70" height="38" text="{currentorder}" font_size="26" pivot="left"/>
+                </rect>
+                <rect depth="1" name="npcDistance" width="70" height="46" pos="230,-6">
+                    <label depth="1" name="TextContent" pos="4, -15" width="70" height="38" text="{distance}" font_size="26" pivot="left" color="{distancecolor}" />
+                </rect>
+                <rect depth="1" name="npcOrderFollow" width="100" height="46" pos="300,-3">
+                    <simplebutton name="btnFollow" depth="3" pos="5, 0" pivot="left" width="100" height="38" font_size="26" caption_key="xuiSCoreFollow" />
+                </rect>
+
+                <rect depth="1" name="npcOrderStayHere" width="100" height="46" pos="405,-3">
+                    <simplebutton name="btnStayHere" depth="3" pos="5, 0" pivot="left" width="100" height="38" font_size="26" caption_key="xuiSCoreStayHere" buff="buffOrderStay2"/>
+                </rect>
+
+                <rect depth="1" name="npcOrderStayThere" width="110" height="46" pos="510,-3">
+                    <simplebutton name="btnStayThere" depth="3" pos="5, 0" pivot="left" width="110" height="38" font_size="26" caption_key="xuiSCoreStayThere" />
+                </rect>
+
+                <rect depth="1" name="npcOrderTeleport" width="110" height="46" pos="630,-3">
+                    <simplebutton name="btnTeleport" depth="3" pos="5, 0" pivot="left" width="110" height="38" font_size="26" caption_key="xuiSCoreTeleport" />
+                </rect>
+
+                <rect depth="1" name="npcOrderDismiss" width="100" height="46" pos="750,-3">
+                    <simplebutton name="btnDismiss" depth="3" pos="5, 0" pivot="left" width="100" height="38" font_size="26" caption_key="xuiSCoreDismiss" />
+                </rect>
+
+            </rect>
+        </score_companion_entry2>
+
+        <!--
+            Column headings for the companion list. One row, sized and placed by the caller.
+
+            It used to hardcode pos="-3,-150" and height="746" - a full window height for a
+            52px strip, and an offset that only landed correctly inside the pivot="center"
+            panel the companions window used to have. Both are parameters now, so the strip
+            sits where windows.xml puts it and the height says what it is.
+
+            Renamed from "header" as well. Every window in this file has a header rect, and
+            a duplicate id makes GetChildById("header") ambiguous inside the one window that
+            holds both. Nothing looks this one up, so the safe name costs nothing.
+
+            width defaults to 900 to match score_companion_entry2 and the list grid's
+            cell_width. Declaring it as a default is deliberate: it overrides the parent
+            seeded value, so the strip stays locked to the entry width rather than
+            stretching with whatever rect it is dropped into.
+        -->
+        <score_companion_header pos="0,0" depth="2" width="900">
+
+            <panel name="companionListHeader" depth="${depth}" pos="${pos}" width="${width}" height="52">
+                <sprite depth="10" name="backgroundMain" sprite="menu_empty3px" pos="3,3" width="${width}" height="52" color="[black]" type="sliced" fillcenter="false" />
+                <sprite color="[mediumGrey]" type="sliced" pos="6,0" height="49" width="${width}" />
+                <rect depth="1" name="npcName" width="154" height="46" pos="6,-6">
+                    <label depth="1" name="TextContent" pos="4, -15" width="136" height="38" text="Name" font_size="26" pivot="left" justify="left"/>
+                </rect>
+                <rect depth="1" name="currentOrder" width="70" height="46" pos="160,-6">
+                    <label depth="1" name="TextContent" pos="4, -15" width="70" height="38" text="Order" font_size="26" pivot="left" justify="center"/>
+                </rect>
+                <rect depth="1" name="npcDistance" width="70" height="46" pos="230,-6">
+                    <label depth="1" name="TextContent" pos="4, -15" width="70" height="38" text="Distance" font_size="26" pivot="left" justify="center" />
+                </rect>
+                <rect depth="1" name="npcOrderFollow" width="310" height="46" pos="300,-3">
+                    <label depth="1" name="TextContent" pos="4, -15" width="310" height="38" text="Orders" font_size="26" pivot="left" justify="center" />
+                </rect>
+
+            </panel>
+        </score_companion_header>
+
+        <!--
+            Mirrors vanilla's togglebutton (XUi_Common/templates.xml) with a cvar-backed controller.
+
+            The geometry defaults below are the ones windowSCoreUtilities wants, because that
+            window is the only consumer - all ten instantiations live in its settings grid.
+            Carrying them here rather than repeating them per call is what lets each toggle be
+            declared with just its name, cvar and captions.
+
+            Only parameters named as ${...} in the body below exist. An instantiation may pass
+            any attribute it likes, but anything not substituted here is silently dropped -
+            createFromTemplate has no mechanism to forward leftovers onto the produced node. The
+            calls used to pass crispness, effect, effect_distance and effect_color, none of which
+            appear here, so none of them ever did anything; the label's outline is the hardcoded
+            effect="outline" below. They have been removed from the call sites rather than added
+            here, since the appearance in game was always the one this template specifies.
+        -->
+        <togglebuttonCVar depth="3" pos="0,0" width="290" height="32"
+                      enabled_font_color="[labelColor]" disabled_font_color="[disabledLabelColor]" visible="true" tooltip_key="" caption="" caption_key="" font_size="24" parse_actions="false">
+            <rect name="${name}" depth="${depth}" pos="${pos}" width="${width}" height="${height}" enabled_font_color="${enabled_font_color}" cvar="${cvar}" disabled_font_color="${disabled_font_color}" controller="XUiC_ToggleButtonCVar, SCore" visible="${visible}">
+                <button name="clickable" sprite="menu_empty" defaultcolor="[mediumGrey]" disabledcolor="[darkGrey]" hoversprite="ui_game_select_row" hovercolor="[white]" type="sliced" hoverscale="1.0" tooltip_key="${tooltip_key}" />
+                <sprite depth="1" name="border" sprite="menu_empty2px" color="[black]" type="sliced" fillcenter="false" />
+                <sprite depth="2" name="tickbox" width="${height-6}" height="${height-6}" pos="7,-4" color="[darkGrey]" sprite="Highlight - Shadowed" type="sliced" />
+                <sprite depth="3" name="tickmark" width="${height-12}" height="${height-12}" pos="10,-7" color="[iconColor]" sprite="ui_game_symbol_check" visible="{value}" />
+                <label depth="2" name="btnLabel" width="${width-height-8}" height="${height-2}" pos="${6+height},${Round(-height/2,0)}" justify="left" text="${caption}" text_key="${caption_key}" effect="outline" pivot="left" font_size="${font_size}" parse_actions="${parse_actions}" />
+            </rect>
+        </togglebuttonCVar>
+
+    </append>
+
+
+</configs>

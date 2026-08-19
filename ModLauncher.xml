@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Servers>
+    <ServerGroup Name="Project Praxis" Logo="" Description="Skills come from use, not from spending points - and fade if you stop.">
+        <Server Name="Project Praxis" Logo="">
+            <Description>
+Project Praxis, with ZZTong's Prefabs, is an overhaul for 7 Days to Die. It changes where your
+character comes from: you no longer spend points on a build, you arrive at one by using the
+skills you want. Praxis means knowledge put into practice - what you can do, rather than what
+you know on paper.
+
+THIS IS A PROOF OF CONCEPT. It is playable, and it is being played, but it is not finished and
+it is not balanced. Progression rates especially are still being tuned, and nothing here
+promises that a world you start today will survive the next update. Treat a save in this pack
+as one you are willing to lose. If a skill climbs absurdly fast, or sits still for a whole day
+while you work at it, that is worth saying out loud - finding those is what this build is for.
+
+None of it makes the game easier in the ordinary sense. Zombies hit as hard as they always
+did, the blood moon still comes, and the world is still trying to kill you. What changes is
+how you get good at surviving it.
+
+PROGRESSION
+Swing a club and you get better with clubs. Mine ore and you get better at mining. Every perk
+levels itself from the actions it governs, and the attribute above it rises from anything in
+its tree, so committing to a few perks pulls their parent up with them.
+
+Perks and attributes cannot be bought, and levelling up awards no skill points to spend. The
+skill window becomes somewhere you look at what you have earned rather than somewhere you shop.
+
+Skills fade if you abandon them. Every one carries a hidden inactivity timer, so a wide,
+shallow character is harder to hold together than a narrow, deep one - everything you are not
+currently doing is quietly cooling off. Your first few days decide a lot: pick the weapon you
+actually enjoy and use it, rather than saving it for later.
+
+Level requirements, attribute caps and perk prerequisites are all unchanged, so your level
+still governs what you are allowed to reach.
+
+COMFORT AND QUALITY OF LIFE
+Crafting reads from containers near you, so materials need not be hauled into your inventory
+first. Block upgrades and repairs read from them too, though not while enemies are close. The
+Drop Box sorts a run's loot back out into the containers that already hold it. Books are
+shared across a party.
+
+Camera and weapon sway are switched off, flickering POI lights hold steady, and whatever you
+are aiming at shows a health bar. Locked containers can be picked with a minigame rather than
+simply refusing you. Chuck and the Rancher have lost their ranged attacks and have to reach
+you to hurt you.
+
+Scenes implying that a person killed another person, or took their own life, are removed - the
+bodies hung from posts, and the noose. Ordinary death is left alone: corpses, blood and bones
+are all still there. Language is softened, and one trader has been persuaded to be civil.
+
+CHALLENGES
+Around eighty extra challenges sit alongside the ones the game ships with, in three new
+categories: an Ability set following the five attributes, mostly ten kills with one particular
+weapon, plus a stealth group asking for sneak kills and unbroken streaks; an SCore set for
+decapitation, crafting with particular ingredients, fire, harvesting, gathering and clearing
+every sleeper from a point of interest; and eight NPC hiring challenges.
+
+THE NPC CHALLENGES CANNOT BE COMPLETED IN THIS PACK. They need an NPC mod to supply someone to
+hire and none is installed. The category is visible but nothing in it will tick over. It is
+left in place so the challenges are there if you add an NPC pack yourself.
+
+A WIDER WORLD
+ZZTong-Prefabs, a separate modlet by ZZTong bundled into this pack, adds over two hundred new
+points of interest, around a hundred and twenty roadside decorations and a set of new city
+tiles. World generation mixes them in with the stock ones on its own - nothing needs
+configuring. The decorations are scenery rather than quest locations and take the place of
+nothing, so having them costs you no POIs. Some of the hunters' traps scattered among them are
+genuinely lethal, so treat an unfamiliar contraption in the woods with more respect than it
+appears to deserve.
+
+ZZTong-Prefabs is GPLv3 and is the work of ZZTong, not of this pack.
+Upstream: https://github.com/zztong/7d2d-prefabs
+
+NOTES
+EAC must be disabled. The pack ships assemblies and will not load with it on.
+
+On a server, install on the server AND on every client. Server side alone mostly works, but
+location names and some trigger wiring will not reach you.
+
+In game, press ESC and choose Mod Help for full detail on any of this.
+            </Description>
+            <Author>sphereii</Author>
+            <Version>3.1</Version>
+            <EAC>Disabled</EAC>
+            <WebSite>https://github.com/SphereII/Project-Praxis</WebSite>
+            <DownloadMode>Release</DownloadMode>
+            <Downloads>
+                <Download>https://github.com/SphereII/Project-Praxis/releases</Download>
+                <AltDownload/>
+            </Downloads>
+        </Server>
+    </ServerGroup>
+</Servers>

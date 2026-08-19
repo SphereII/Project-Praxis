@@ -1,0 +1,8563 @@
+﻿#0-SCore
+
+The 0-SCore is the key component to enable extra functionality for 7 Days To Die. Using a mixture of Harmony, SDX Patch Scripts, and Scripts, 
+new features are enabled for modders and players to use.
+
+| Folder | Description |
+| ----------- | ----------- |
+| Config | XML Files that serve as documentation, basic setup for required items. blocks.xml contains many default settings to review and adjust as needed.|
+| Harmony | Many harmony scripts to make small adjustments to the game. These scripts, for the most part, can be turned on and off via the blocks.xml|
+| Scripts | Many Scripts which include new classes. References to these scripts would be  ```<className>, SCore```  |
+|Features | Features will contain all the code necessary for a particular feature, grouping the code so it can be easily found and extracted. |
+
+### Direct Downloads
+Direct Download to the 0-SCore.zip https://github.com/SphereII/SphereII.Mods/releases/latest
+
+### Documentation and Worked Examples
+
+`Documentation/` holds the reference material for SCore's own features - `XPath/Conditionals.md`
+for `mod_loaded()` and friends, `Features/`, `MinEvents/`, `AI/`, `Challenges/`.
+
+For the game's UI system specifically, `Mods/Ideas/XUI_SYSTEM_REFERENCE.md` is a working reference
+derived from decompiling `Assembly-CSharp.dll` rather than from community guides: binding
+resolution, the XPath patch verbs, template limits, the scroll and tab recipes, `-debugxui`, and a
+collected list of the traps. Read it before building a new window.
+
+The modlets in this repo double as worked examples. If you are trying to do a thing, one of these
+has probably already done it:
+
+| Want to... | Look at |
+| ----------- | ----------- |
+| Build a whole new in-game window, with tabs and scrolling | `0-Help Screens/Config/XUi_InGame/windows.xml` |
+| Give a modded window its own controller from your own DLL | `0-Help Screens/Scripts/XUiC_HelpScreens.cs`, reached by `controller="HelpScreens, SphereIIHelpScreens"` |
+| Wire a button into a vanilla menu that hard-codes its own | `0-Help Screens/Harmony/XUiC_InGameMenuWindow_HelpButton.cs` |
+| Let other modlets extend your window without touching your files | `0-Help Screens/ReadMe.md` - the one-append contract |
+| Gate a patch on another modlet being installed | `SphereII Peace of Mind/Config/blocks.xml`, or any `Config/XUi_InGame/windows.xml` contributing a help section |
+| Read and display a value off a skill row | `0-SCore/Features/LearnByDoing/Harmony/`, consumed by `SphereII Learn By Doing/Config/XUi_InGame/templates.xml` |
+| Turn SCore features on without writing anything new | `SphereII A Round World/Config/blocks.xml` |
+
+Note the load-order rule that governs all of the above: modlets are applied in **alphabetical order
+of folder name**, and a modlet patching a file or node that does not exist yet is skipped in full,
+silently. A modlet that others extend has to sort ahead of them.
+
+### Change Logs
+Summary for 2.0 Update:
+This release of 0-SCore introduces significant enhancements across several core systems, with a strong emphasis on **Shared Reading**, **NPC behaviors (including farming and combat)**, **block placement controls within POIs**, and **performance optimizations**.
+**Key Highlights:**
+
+* Shared Reading System: A major new feature allowing party members to share unlocked content from books and items. This includes new localization entries and fixes for server and client-side issues.
+* Improved NPC AI and Behaviors:
+	* Farming: Reworked Utility AI for farming tasks, making farmers more reliable, preventing task locks and accidental destruction of farm blocks, and keeping them closer to their farms. Sprinklers can now be individually controlled and detect water sources more effectively, and can even extinguish fires.
+	* Combat/General: Fixed issues with NPC bandit weapon handling, enabled patrol points for EntityEnemySDX, and exposed more configuration options for NPC movement (e.g., `BlockTimeToJump`, `BlockedTime`).
+	* Dialog: Patches for improved dialog functionality, including displaying statements in the subtitle window for EntityAliveSDX and allowing dialogs to inherit and combine from multiple sources using an "extends" property.
+* POI Building Restrictions: Introduced a new patch and configuration options to prevent players from placing blocks within specific POI bounds, based on prefab names or tags. This aims to maintain the integrity of designed POIs.
+* Performance and Refactoring:
+	* Fire Manager V2 & Food Spoilage V2: Both systems underwent significant AI-assisted refactoring to improve performance, breaking down classes into helper classes and cleaning up code.
+* Localization Enhancements: Added a new localization method to ensure localized entries are always retrieved, even if the direct key is missing (checking for `Name` or `Desc` suffixes). Also added support for `<include>` tags in Localization files, allowing for better organization.
+* Bug Fixes and Stability: Addressed various null reference errors, spamming issues with spoiled items, durability bar disappearing, and general migration/refactoring for broken references and changed parameters.
+
+
+
+[ Change Log ]
+
+	*** MIGRATION NOTICE - POI DESIGNERS - PATHING AND SPAWN CUBE CONFIGURATION ***
+
+	Existing pathing cube, spawn cube and sign portal configuration is NOT
+	carried forward. Plan on re-entering it.
+
+	These blocks keep their programming (task=, buff=, pc=, ec=, eg=, Location)
+	in their sign text, and the sign text lives in the block's tile entity.
+	Through 3.0 they extended BlockSign, which creates no tile entity at all, so
+	there was nowhere for that text to be stored or saved. Any cube placed - or
+	any POI opened and re-saved - while that was the case has no sign data left
+	to recover. Nothing in SCore can reconstruct it; the text was never written.
+
+	What this means in practice:
+		- Walk your POIs, re-enter the configuration on each cube, and re-save
+		  the prefab. A blank cube is silent: it now loads cleanly and applies
+		  nothing, so NPCs spawn with no orders rather than logging an error.
+		- One case does survive automatically. A prefab still carrying
+		  pre-3.0 legacy sign data has that data migrated into the new
+		  composite tile entity on load, which the old block class refused to
+		  do. If a POI has not been re-saved since before 3.0, check it before
+		  replacing anything - its cubes may already be intact.
+		- Check the cubes themselves as well as their text: off the BlockSign
+		  base they no longer stamp a phantom duplicate one cell above, so a
+		  cube declared "1,1,1" now genuinely occupies one cell.
+
+  
+Version: 3.1.30.743
+	Game Version: v3.1.0 (b14)
+
+	[ Advanced Zombie Features - Random Size and Random Walk ]
+		- Both features were checked against the current game assembly and
+		  repaired. The hooks themselves survived - walkType is still written
+		  by EntityAlive.CopyPropertiesFromEntityClass, though the field is
+		  public now rather than private - but the game grew an
+		  EntityClass.SizeScale that Random Size was quietly discarding.
+		- Random Size now multiplies the entity class's own SizeScale instead
+		  of replacing it. Around fifteen vanilla zombie classes set it
+		  (zombieChuck 1.2, zombieBoe and friends 1.08, zombieArlene 0.9), and
+		  those were rendering at the rolled scale while their capsule stayed
+		  sized for SizeScale as well, because Entity.SetScale assigns
+		  localScale outright but multiplies the physics extents. A zombieBoe
+		  that rolls 1.1 is now 1.188, model and collider agreeing. A roll of
+		  1.0 is left alone entirely.
+		- The size is applied in EntityAlive.PostInit rather than on the first
+		  Update. PostInit is the last thing
+		  EntityFactory.CreateEntityOperation.CompleteEntity does, so
+		  OverrideSize is populated before the entity can be handed to anyone.
+		  That is what makes the size reach multiplayer clients: the server
+		  snapshots OverrideSize into an EntityCreationData when it builds a
+		  spawn packet, and a zombie distributed before its first frame used
+		  to go out at size 1 and stay that way on that client for good.
+		  Clients never roll or apply a size themselves.
+		- An entity that arrives already sized - a chunk reload, or a prefab
+		  copy - keeps the size it came in with instead of being re-rolled.
+		  SetScale multiplies the physics extents on every call, so scaling
+		  again on top of what CompleteEntity already applied would compound
+		  them. Sizes are stable across restarts now.
+		- RandomSize="false" opts an entity out. The check was an OR chain
+		  that let "is this an EntityZombie" short-circuit ahead of the
+		  property, so a zombie could never be excluded. An explicit
+		  RandomSize now wins in both directions; without one, zombies and any
+		  class carrying a RandomSizes list are randomized as before.
+		- The per-frame cost is gone. The Update patch is a fallback now that
+		  reads one float off the entity and stops, where it used to run an
+		  uncached ConfigFeatureBlock property scan, two EntityClass property
+		  lookups and a string interpolation for every EntityAlive in the
+		  world on every frame - and the interpolation built its log line
+		  whether or not logging was enabled. It is keyed off OverrideSize, so
+		  a vanilla buff-driven MinEventActionSetScale is left alone rather
+		  than fought every frame.
+		- Random Walk no longer hands a whole spawn wave the same gait. It
+		  built a new System.Random per entity, which seeds from
+		  Environment.TickCount, so every zombie constructed in the same tick
+		  drew the same walk type. A horde varies now.
+		- Crawlers are detected with the game's own IsWalkTypeACrawl instead
+		  of a hardcoded "21 or 22", so the named types the game now exposes -
+		  cWalkTypeFat 1, cWalkTypeCripple 5, cWalkTypeCrouch 8,
+		  cWalkTypeBandit 15, cWalkTypeCrawlFirst 20, cWalkTypeCrawler 21,
+		  cWalkTypeSpider 22 - stay covered. The default pool holds only the
+		  upright types vanilla actually ships: walk type 4 is no longer used
+		  by any entity class, and 8 and 15 are reserved for the crouch swap
+		  and for bandits.
+		- An empty or malformed RandomWalkTypes leaves the entity on its
+		  configured WalkType instead of throwing.
+		- Both features are documented in
+		  0-SCore/Harmony/ZombieFeatures/ReadMe.md, whose stated default
+		  ranges had drifted from the code for each of them.
+
+	[ In-Game Windows - Lock Picking, Utilities and Companions ]
+		- The weapon sway toggle never did anything. It wrote a cvar named
+		  WeaponSway, while SwayUtilities.CanSway and the weaponsway console
+		  command both read $WeaponSway, and XUiC_SCoreUtilities writes
+		  CVarName through verbatim - so the two never met. The row declares
+		  $WeaponSway now.
+		- Two rows shared the name toggleToggleMemoryBudget, the memory budget
+		  setting and the post processing one. They are toggleMemoryBudget and
+		  togglePPEnable now.
+		- All three windows in XUi_InGame/windows.xml were rebuilt on the
+		  vanilla chrome templates the game and 0-Help Screens use: a
+		  fullscreencollider for the input block and dimmed backdrop, a 43px
+		  header rect carrying headerbg, and a padded content rect carrying
+		  boxbg. Between them these replace a pair of hand-rolled 8000x8000
+		  on_press panels per window, a news_background texture stretched to
+		  the camera, and a background sprite drawn at hand-computed
+		  coordinates.
+		- The practical gain is that the frames size themselves. boxbg derives
+		  its border and background from outerwidth/outerheight, so the chrome
+		  cannot drift from the rect it sits in. The old sprite arithmetic had
+		  to be redone whenever a row was added, and needed a second variant
+		  because the conditional Locks block changes the content height.
+		- Centred windows place themselves the way vanilla does now, anchor
+		  center with pos at (-width/2, height/2). windowSCoreUtilities was
+		  pos="0,400" on a 1185 wide window, which is what the pivot="center"
+		  content panel and the grid parked at x -145 were compensating for;
+		  with the window centred properly the content sits at its natural
+		  0,0. windowSCoreCompanions was panel="Center", docking into the
+		  shared centre panel meant for the backpack layout, although it opens
+		  standalone as its own window group.
+		- Utilities and Companions pause the game now. Lock picking
+		  deliberately does not: the minigame is a live GameObject whose
+		  CipherControls polls Unity Input directly and whose Keyhole drives an
+		  animator, so pausing would freeze the lock being picked.
+		- Lock picking also stays a caption strip rather than becoming a dialog
+		  like the other two. SphereLocks renders a 3D lock prefab through its
+		  own camera in the middle of the screen, so the strip is parked at the
+		  top with the centre left clear, and its backdrop keeps the light
+		  alpha 140 rather than the 240 the settings windows use. Darkening it
+		  to match would hide the minigame.
+		- Companions is 940 wide because the content decides it, not the other
+		  way round: score_companion_header and score_companion_entry2 are both
+		  900 and the list grid's cell_width is 900, so the padded inner area
+		  has to be 900, plus 2x20 padding. Its header also gained the headerbg
+		  it never had.
+		- togglebuttonCVar carries the geometry every row wants as template
+		  defaults now, since windowSCoreUtilities is its only consumer, so a
+		  row declares just its name, cvar and captions. The ten call sites had
+		  each been repeating crispness, effect, effect_distance and
+		  effect_color, none of which the template names as parameters -
+		  createFromTemplate drops attributes it cannot substitute, so none of
+		  them had ever done anything. They are gone rather than added, because
+		  the appearance in game was always the one the template specifies.
+		- score_companion_header takes pos, depth and width instead of
+		  hardcoding pos="-3,-150" and height="746" - a full window height for
+		  a 52px strip, and an offset that only landed correctly inside the
+		  pivot centre panel that is now gone. Its inner panel was also named
+		  "header", which collides with the window's own header rect under
+		  GetChildById; it is companionListHeader now.
+		- Save is a sibling of the settings grid rather than its last cell, so
+		  it sits bottom right instead of needing a -80 nudge inside a 34px
+		  cell.
+		- Both files carry the reasoning inline now. Most of it is the
+		  controller contracts, which the XML cannot show on its own:
+		  XUiC_SCoreUtilities knows no row by name and walks
+		  GetChildrenByType<XUiC_ToggleButtonCVar> for both seeding and saving,
+		  so adding a setting is a one line change with no C# to match, and
+		  SCorebtnSubmit is the only id it looks up; XUiC_SCoreCompanionList
+		  requires the toggleNPCFootsteps id and needs the grid to stamp at
+		  least as many rows as a player can have companions. Also recorded:
+		  the blank <rect/> entries in the settings grid are deliberate section
+		  spacers rather than leftovers, and how much room each content rect
+		  has left.
+
+	[ Help Screens - Three More Modlets Documented ]
+		- SphereII Challenges, SphereII Disable Sway and SphereII Disable
+		  Special Attack contribute their own sections to the 0-Help Screens
+		  window now, joining Learn By Doing, A Round World, Peace of Mind and
+		  A Better Life.
+		- Challenges gets four pages - Overview, Ability, SCore and NPC -
+		  covering the roughly eighty challenges it adds, what each category
+		  asks for, and the fact that SCore is required for any of them to
+		  appear at all.
+		- Disable Sway and Disable Special Attack get three each: Overview,
+		  What It Changes, and Notes. The Notes pages carry what actually
+		  catches people out - Disable Sway needs EAC off and is client side
+		  only, and its weaponsway command reads inverted and does not survive
+		  a reload; Disable Special Attack is XML only, safe to add mid save,
+		  and loses to any modlet sorting after it.
+		- Each is one <append> plus Localization keys, per the contract in
+		  0-Help Screens/ReadMe.md. Disable Sway had no Localization.csv at all
+		  before this and has one now.
+
+	[ Challenges - Objective Filters and Turret Kills ]
+		- An objective filtering on item_material alone was passing
+		  unconditionally. The guard that short circuits when there is nothing
+		  to check tested itemClass and itemTag but not item_material, so a
+		  material-only objective fell through to "nothing to validate" and
+		  returned true regardless of what the player was holding.
+		- item_material was also being run through the tag test. A material is
+		  an id off materials.xml - Mwood, Mmetal - not a tag, so parsing it
+		  into FastTags produced something that could never match. It uses
+		  SCoreChallengeUtils.IsHoldingItemMaterial now, which already existed.
+		- The auto turret and shotgun turret challenges could not be completed
+		  except by accident. KillWithItem matches a trap kill through
+		  IsKilledByTrap, which compares against DamageResponse.Source
+		  .AttackingItem - the ammo that was fired, not the block that fired
+		  it - and both challenges named the block. Since neither block has an
+		  item of its own, the only way to score was to happen to be holding
+		  the turret at the moment of a kill. They now list the ammo each block
+		  accepts, taken from its AmmoItem in blocks.xml.
+		- Two entries are marked UNVERIFIED in the file rather than changed.
+		  mineCookingPot and bladeTrap are both blocks with no ammo item, so
+		  there is no name to substitute, and whether their damage carries an
+		  AttackingItem at all could not be settled from the assembly. Both
+		  need a look in game.
+		- The ClearPoi and ClearPoi2 challenges in challenges-02.xml were
+		  displaying raw localization keys. Their title, short and description
+		  strings and the hint they reference have been added.
+
+	[ Disable Sway - The Console Command Now Works ]
+		- In the standalone modlet the command had no effect. SwayUtilities
+		  .CanSway returned false unless the Z-SphereIIDebugging modlet was
+		  installed and never consulted a cvar at all, so weaponsway wrote
+		  $WeaponSway and nothing read it - there was no way to turn the motion
+		  back on short of uninstalling. CanSway reads the cvar now.
+		- The two copies agree on polarity: 1 suppresses sway, 0 restores it.
+		  That is not cosmetic. Both copies patch the same four methods
+		  (vp_FPCamera and vp_FPWeapon, UpdateSwaying and UpdateBob) and
+		  Harmony skips the original if any prefix returns false, so opposite
+		  readings would leave the command unable to restore motion whenever
+		  both were installed.
+		- Where they differ is deliberate and documented in both: with no cvar
+		  set, SCore starts from vanilla sway and lets the command switch it
+		  off, while the modlet - whose whole purpose is to have it off -
+		  starts suppressed.
+		- The command itself was reworked in both copies. It has a real
+		  getHelp() spelling out that the parameter says whether to SUPPRESS
+		  the motion, so weaponsway true is the one that turns sway off; it
+		  says what happened rather than echoing a bool; it explains itself
+		  when there is no local player instead of returning silently; and the
+		  refusal for a remote sender now says why rather than just
+		  "Command can only be used on clients."
+		- Both also warn that restoring motion lasts only for the session,
+		  since it is stored as a zero valued cvar and the game does not write
+		  those into a save.
+		- 0-SCore/Features/WeaponCameraSway/ReadMe.md documents the four
+		  suppressed motions, the command, and a table of what each cvar value
+		  means. The modlet csproj now ships its Config folder.
+
+  
+Version: 3.1.25.1535
+	Game Version: v3.1.0 (b14)
+
+	[ New Modlet - 0-Help Screens ]
+		- An in-game help system that other modlets add their own pages to.
+		  ESC now carries a Help button beside Options and Sandbox Settings,
+		  opening a window with a scrolling column of modlets down the left and
+		  that modlet's pages as tabs along the top.
+		- The point of it is that no modlet ships UI of its own. 0-Help Screens
+		  owns the window; a contributor adds one <append> holding its section,
+		  plus a handful of Localization.csv keys. It never declares a button at
+		  either level - both strips fill themselves in from the pages found.
+		- Built on the game's own XUiC_TabSelector, one instance for the left
+		  column and one per section for the tabs. The only C# in the modlet is
+		  the ESC menu button, because XUiC_InGameMenuWindow.Init wires exactly
+		  ten buttons by name and an appended eleventh would otherwise be inert,
+		  and the window's own Close button. Because it ships an assembly it
+		  needs EAC disabled.
+		- Sections are wrapped in <conditional> on
+		  mod_loaded('sphereii_help_screens'), so a contributing modlet is a
+		  clean no-op for anyone who does not have Help Screens installed.
+		- Load order matters and is not optional: modlets apply in alphabetical
+		  order of folder name, and a modlet patching a window that does not
+		  exist yet is skipped in full, silently. The folder is named to sort
+		  near the front; a contributor's folder must sort after it.
+		- Supported so far by SphereII Learn By Doing, SphereII A Round World,
+		  SphereII Peace of Mind and SphereII A Better Life.
+		- The contract, with a block to copy, is in 0-Help Screens/ReadMe.md.
+		  For the underlying UI system see Mods/Ideas/XUI_SYSTEM_REFERENCE.md.
+
+	[ Learn By Doing - Overhaul ]
+		- Learn By Doing has had a heavy pass, around sixty changes, and almost
+		  all of it correctness rather than balance. The recurring theme is that
+		  the system fails silently: a mistyped buff name, a progression_name
+		  the game does not know, a cvar nothing ever set, or a requirement
+		  class that does not exist all resolve to "nothing happened" with no
+		  error. Seven progressions could never level at all, three decays never
+		  fired, and eight award paths granted nothing.
+		- Notable beyond the fixes: crafting skills were given their own, much
+		  longer XP curve instead of sharing the five-level perk curve; repeat
+		  crafting the same item is now caught by identity rather than by a
+		  cooldown, which could never throttle it; T0 starter gear scores up to
+		  level 10, closing the gap before T1 recipes unlock; movement XP is
+		  throttled; and attribute thresholds were cut from 5000 to 1200 after
+		  logging showed an attribute cost seventeen times what a perk did.
+		- Debug logging is now gated on a $lbd_debug cvar rather than on having
+		  the god buff, which had been making the player invulnerable and so
+		  hiding the damage-driven perks it was meant to observe. All 671 debug
+		  lines moved to LogMessageCVars, SCore, which expands @cvar tokens - the
+		  vanilla action logged the cvar's name instead of its value, so the
+		  lines could not answer the question they existed for.
+		- SCore classes this leans on: MinEventActionLogMessageCVars,
+		  MinEventActionSetCVarFromItemType, MinEventActionLogTargetBlock,
+		  RequirementCraftedItemMatchesCVar and RequirementCraftedBlockHasTags.
+		- Buying perks and attributes with skill points is switched off, and no
+		  skill points are awarded - progression is earned in play. The Cost and
+		  Buy columns and the points counter are hidden to match.
+		- A Testing folder was added: lbd_audit.py parses every config file and
+		  writes a per-level test plan plus a checklist of all award paths, and
+		  validates buff names, cvars, progressions, block tags and ", SCore"
+		  class references against what actually exists. lbd_logparse.py turns a
+		  Player.log into coverage and real per-level timings. Most of the bugs
+		  above were found by those two rather than by playing.
+		- Full detail, change by change, is in
+		  SphereII Learn By Doing/ReadMe.md.
+
+	[ Learn By Doing - Skill Bar Decay Colour ]
+		- The "color" binding on XUiC_SkillEntry, XUiC_SkillAttributeLevel and
+		  XUiC_SkillPerkLevel now returns a colour XUi can actually parse.
+		- All three built their values with new Color(0, 255, 54, 128) - byte
+		  values handed to a constructor that takes floats 0-1 - and
+		  CachedStringFormatterXuiRgbaColor takes a Color32, so Unity's implicit
+		  conversion ran every channel through Mathf.Clamp01 and produced opaque
+		  cyan (0,255,255,255) rather than translucent green. Yellow and red
+		  survived the conversion but came out fully opaque.
+		- The no-skill early out was worse. It assigned Color.ToString(), which
+		  yields "RGBA(0.000, 255.000, ...)" and is not a colour string at all.
+		- Thresholds and colours now live in one place,
+		  Features/LearnByDoing/Scripts/LbdDecayColor.cs, instead of being
+		  restated in each of the three postfixes - which is how three copies of
+		  the same bad literal came about. Green at a decay counter of 2 or
+		  below, yellow to 4, red beyond, all at alpha 128.
+		- Nothing had ever consumed this binding, so the bug was invisible: the
+		  skill progress bars were painted with a literal green and a skill
+		  drifting toward decay looked identical to one used daily. See
+		  SphereII Learn By Doing, Config/XUi_InGame/templates.xml, where the
+		  three BarContent sprites now bind color="{color}".
+		- Learn By Doing needs this build or later. An older SCore leaves those
+		  bars cyan rather than green - wrong, but not broken.
+
+Version: 3.1.22.801
+	Game Version: v3.1.0 (b14)
+
+	[ Refactor ]
+		- Refactored all GetUIForPlayer(*) calls to GetUIForPrimaryPlayer().
+
+	[ XUi - Custom Controls Were Never Loading ]
+		- Config/XUi_InGame/controls.xml appended to /controls. The game no
+		  longer ships that file, and a mod XML file whose vanilla counterpart
+		  does not exist is skipped in full - no error, no warning, nothing
+		  applied.
+		- Everything it defined was therefore absent: score_companion_header,
+		  score_companion_entry2 and togglebuttonCVar. The last of those is
+		  instantiated 11 times by XUi_InGame/windows.xml across the SCore
+		  utilities window, so the lock pick, quiet NPC, mute trader,
+		  flickering lights, auto redeem challenges, weapon sway and memory
+		  budget toggles were all unresolved tags.
+		- Those controls are now templates. The file is
+		  Config/XUi_InGame/templates.xml appending to /templates. The markup
+		  is otherwise unchanged and windows.xml needed no edit, since it
+		  instantiates them by tag name either way.
+
+	[ XUi - Removed Attributes The Engine No Longer Knows ]
+		- disableautobackground, createuipanel, backgroundspritename and
+		  borderthickness appear in no shipped assembly, and in no vanilla XML
+		  apart from one stale backgroundspritename. They parse as unknown
+		  attributes and do nothing.
+		- Stripped from Config/XUi_InGame/windows.xml and templates.xml. The
+		  panels in those windows draw their backgrounds from explicit child
+		  sprites, so nothing was relying on them.
+
+	[ UtilityAI - Short Range Destinations Were Rewritten To The NPC's Own Position ]
+		- Reported by the NPCVoiceControl team (Xyth) and measured in game:
+		  NPCs failed to path whenever the goal was inside 5m, recorded at
+		  2.0m, 3.4m, 3.9m and 4.5m, and never once outside it.
+		- SCoreUtils.FindPath routes through GetMoveToLocation, which returns
+		  the NPC's own x/z for any destination within 5m horizontally and
+		  1.5m vertically. A* was being asked to path from where the NPC stood
+		  to where it already stood, and the calling task read the empty
+		  result as "no route". Follow and heal suffered worst, since their
+		  destinations are inside 5m by definition.
+		- The cause is the maxDist default rather than the ladder handling.
+		  The vanilla derived original this was copied from,
+		  UAITaskMoveToSDX.GetMoveToLocation, takes maxDist from its caller as
+		  the equipped weapon's range, roughly 0.75-1.0m. Returning the
+		  entity's own position is arrival logic at that scale - "you are
+		  already in range, stay put" - and is correct there. Defaulting
+		  maxDist to 10 while the early out stayed at 5 made every short move
+		  report as arrived and left the approach branch unreachable.
+		- maxDist now defaults to 1, which restores all three branches: past
+		  5m path to the destination, within 1m hold position, and in between
+		  clamp to 1m short of the target and snap to the surface. Changed in
+		  Scripts/UtilityAI/UAISCoreUtils.cs and in the NPCv4 copy at
+		  Features/NPCv4/UtilityAI/Utils/PathingUtils.cs, the latter through a
+		  new AIConstants.MoveToArrivalDistance.
+		- Worth watching: that clamp branch has never executed in a shipped
+		  build. It is live now for every move between 1m and 5m.
+
+	[ UtilityAI - MoveToTargetSDX Never Asked For A Path ]
+		- A separate fault behind the same reports of NPCs grinding into walls
+		  while approaching an enemy.
+		- Start sets _position from the target, and Update then took the
+		  "entity hasn't moved very much" branch, which steered straight at
+		  that position through moveHelper.SetMoveTo and returned. Against a
+		  stationary target the branch ran on every tick beginning with the
+		  first, so FindPath was never reached at all - not once across the
+		  task's whole lifetime.
+		- That shortcut is now gated on actually holding a path. If one is
+		  running or being calculated the navigator follows it; with no path,
+		  direct steering is confined to the last 2.1m and anything beyond
+		  falls through to FindPath.
+		- The "we are close enough" arrival test moved above that branch. It
+		  had been unreachable for the same reason, so against a stationary
+		  target the task never stopped and never handed off at melee range.
+		- Both Scripts/UtilityAI and the NPCv4 copy.
+
+Version: 3.1.20.1347
+	Game Version: v3.1.0 (b14)
+
+	[ TileEntities - AoE And Powered Portal Reads Corrupted The Chunk ]
+		- Field report from bdubyah: a brand new world spawned in fine, but
+		  reloading it threw a chunk load exception preceded by a run of
+		  "Dropping TE with unknown/outdated type", "chunk sleeper volumeId
+		  invalid", and an IndexOutOfRangeException that then spammed from
+		  EntityPlayerLocal.BlockRadiusEffectsTick until the save was
+		  reloaded. The POI being spawned into contained DecoAoE blocks.
+		- Root cause is SCore's own InstantiateFromRead prefix. Chunk.save
+		  writes each tile entity as its type followed by its payload, and
+		  InstantiateFromRead is contracted to construct the tile entity and
+		  read that payload back off the stream. The prefix constructed
+		  TileEntityAoE and TileEntityPoweredPortal and returned immediately,
+		  never calling read.
+		- The payload stayed in the stream, so the reader was left parked mid
+		  record and everything after it was interpreted at the wrong offset.
+		  The next tile entity's "type" was really payload bytes, and the
+		  sleeper and wall volume sections after the tile entity list desynced
+		  along with it. A single AoE block was enough: its inherited base
+		  payload is 22 bytes in Persistency mode.
+		- Nothing in the resulting log pointed back at the cause. The dropped
+		  type warnings, the invalid volume ids, the GetBlock failure with a
+		  nonsense y of 1179648, and the exception that made vanilla discard
+		  the chunk were all downstream of a tile entity that had loaded
+		  "successfully" and logged nothing.
+		- The prefix now calls read on the tile entity it builds, matching the
+		  branch of the vanilla method it replaces. Neither type is a
+		  TileEntityComposite, so the plain read overload is correct.
+		- A later report showed the same desync surfacing as "An item with the
+		  same key has already been added. Key: 0, 0, 0" from Chunk.read. That
+		  is triggerData.Add, the trigger section that follows the tile entity
+		  list, reading zeros out of misaligned data. Same fault, further
+		  downstream, not a separate bug.
+		- Region files written by a clean load are valid; the write side was
+		  always symmetric. But a chunk that desynced without throwing was
+		  held in memory with its tile entities collapsed onto local (0,0,0)
+		  and its trigger and volume data wrong, and Chunk.save would write
+		  that back. A world loaded and re-saved under the broken build can be
+		  damaged on disk. Test on a world created after this fix.
+		- Found with LogDroppedTileEntityDetail. Its "payload did not decode"
+		  line was the clue: it means the reader was already at the wrong
+		  offset on arrival, so the fault lay upstream of every block named.
+
+	[ ErrorHandling - A Bare DestroyFX Made Blocks Indestructible ]
+		- Follow up from the same report: after the chunk errors cleared,
+		  hitting a DecoAoE block threw a single IndexOutOfRangeException from
+		  Block.SpawnFX per swing, and the block never broke.
+		- Block.SpawnFX splits its effect name on a comma and indexes the
+		  second token without checking. Every vanilla DestroyFX value is a
+		  particle and a sound, so vanilla never trips it, but a modded block
+		  whose DestroyFX is a bare particle name throws.
+		- Not a cosmetic failure. Block.OnBlockDamaged fires the destroyed
+		  quest event, calls SpawnDestroyFX, and only then runs
+		  SetBlockRPC(_bvRef, BlockValue.Air). The throw lands between the
+		  last two, so the block absorbs the killing blow and is never
+		  cleared. To the player it is an indestructible block that errors on
+		  every hit, and its block-destroyed event has already fired.
+		- New FixMalformedDestroyFX flag, on by default, skips the malformed
+		  effect so destruction completes, and logs the block name, position
+		  and offending value once per bad string.
+		- This is a guard, not a fix for the block. The correct DestroyFX is
+		  "particleName,soundName" - for example
+		  "blockdestroy_wood,trapWoodDestroy". SCore's own DecoAoE test block
+		  does not set DestroyFX and was never affected; the value comes from
+		  the block's own XML or whatever it extends.
+
+	[ ErrorHandling - Dropped TE Warning Read As A Block Position ]
+		- Reworded the failed-peek line of LogDroppedTileEntityDetail after it
+		  misled its first reader. Each drop prints the chunk's block extent,
+		  and when the peek fails there is no position at all - but the two
+		  together read as a coordinate, and the extent's low corner got taken
+		  for the offending block's location. An afternoon went into
+		  inspecting an innocent door standing at that corner.
+		- The line now states outright that no block position is known, that
+		  the coordinates are the chunk's extent and not a location, and that
+		  the fault is upstream: something earlier in the chunk read fewer
+		  bytes than it wrote. It also names the shape of that fault, since it
+		  is invisible on its own - a tile entity that loads successfully
+		  without consuming its payload logs nothing at all.
+		- Features/ErrorChecks/ReadMe.md carries the same warning, and its
+		  "Acting on it" section now splits on whether the payload decoded.
+		  The AoE bug above is written up there as the worked example of a
+		  payload that did not.
+
+	[ Challenges - GatherTags Objective Used The Wrong Player UI ]
+		- ChallengeObjectiveGatherTags.HandleAddHooks resolved the inventory
+		  through LocalPlayerUI.GetUIForPrimaryPlayer(). It now
+		  uses LocalPlayerUI.GetUIForPrimaryPlayer(), so the backpack and
+		  toolbelt change hooks bind to the primary local player's UI.
+
+Version: 3.1.15.1235
+	Game Version: v3.1.0 (b14)
+
+	[ Logo ]
+		- Added a new requires_score.png by Mumpfy
+
+	[ UtilityAI - Door Auto-Close Corrupted The SphereCache Dictionary ]
+		- Field report: an unhandled InvalidOperationException, "Operations
+		  that change non-concurrent collections must have exclusive access",
+		  thrown from SphereCache.AddDoor by way of SCoreUtils.IsBlocked
+		  during a wandering NPC's AI tick.
+		- Root cause: CheckForClosedDoor scheduled the door's automatic close
+		  with Task.Delay(2000).ContinueWith(...). ContinueWith with no
+		  scheduler argument runs on a thread pool thread, so CloseDoor - and
+		  the SphereCache.DoorCache.Remove inside it - ran off the main thread
+		  two seconds after every door an NPC opened, while the AI wrote that
+		  same dictionary from the main thread.
+		- The reported crash site is not where the damage was done. That
+		  exception comes from a collision-count guard in Dictionary.FindEntry
+		  which trips when the bucket chain has become a cycle. The cycle is
+		  created earlier by an interleaved write, and every later lookup on
+		  that bucket throws. This is why the error surfaced at moments
+		  unrelated to any door, and why it appeared that looting caused it.
+		- The dictionary was the lesser problem. CloseDoor also calls
+		  EntityUtilities.CloseDoor, which reads the world, resolves the chunk
+		  and calls Block.OnBlockActivated - a block state change with a
+		  network RPC - all from the pool thread.
+		- Both copies of the code, SCoreUtils.CheckForClosedDoor and the V4
+		  DoorUtils.CheckForClosedDoor, now queue the close back onto the main
+		  thread with ThreadManager.AddSingleTaskMainThread. The delay before
+		  the door shuts is unchanged.
+		- SphereCache's door and pathing accessors take a lock as defense in
+		  depth, and their ContainsKey-then-index pairs are collapsed into
+		  TryGetValue. GetPaths still returns the live list, so the lock
+		  covers the dictionary, not a caller's later iteration of that list.
+
+	[ ErrorHandling - LogDroppedTileEntityDetail For Legacy TE Spam ]
+		- New diagnostic, off by default. Vanilla's warning, "Dropping TE with
+		  unknown/outdated type: X", names no position, so a save full of
+		  legacy tile entities gives a wall of warnings and nowhere to look.
+		- The important part is that the type numbers in that wall are not
+		  real. Chunk.read reads a TE's type then calls InstantiateFromRead,
+		  which on an unrecognised type logs and returns null without
+		  consuming the record's payload. The reader is left parked mid
+		  record, so the next iteration reads payload bytes as a type. A
+		  single bad tile entity desyncs the rest of the chunk, and every
+		  warning after the first is shifted data. Only the first drop in a
+		  chunk is evidence.
+		- This is also where "Outdated loot data" comes from. Once desynced,
+		  a garbage type eventually matches a legacy loot type and
+		  TileEntityLegacyUtils parses the surrounding noise as a container.
+		  It is a symptom of the first drop, not a separate fault.
+		- With the flag on, each drop reports the chunk and its block range,
+		  the POI, the raw type value alongside the enum name (the name alone
+		  hides it, and "None" reads as "nothing there" when it means the
+		  field held 0), and the stream offset. The first drop in a chunk is
+		  labelled as the one to chase and the rest as cascade.
+		- Because the payload is still sitting unread in the stream, the first
+		  drop also peeks it. TileEntity.read starts with a version and the
+		  TE's chunk-local position, so when those bytes decode to a sane
+		  header the warning names the exact world position and the block
+		  standing there. The peek restores the stream position and is
+		  invisible to the caller. If it does not decode, that is reported
+		  too - it means the chunk was already out of sync before that entry.
+		- Exceptions escaping the read are logged with the same context before
+		  being allowed to propagate, so "Outdated loot data" now arrives with
+		  a chunk, a type and a drop count instead of only a chunk.
+		- Diagnostic only. The tile entity is still dropped and load behaviour
+		  is unchanged.
+		- Features/ErrorChecks/ReadMe.md is new and walks through turning the
+		  flag on, reading the output field by field, and what to do with the
+		  block it names. Point anyone chasing legacy TE spam at it.
+
+	[ FireV2 - AddFireDamage Ran Off The Main Thread ]
+		- MinEventActionAddFireDamage carried the identical pattern:
+		  Task.Delay(delayTime).ContinueWith(...) calling AddFire from a
+		  thread pool thread. It now queues onto the main thread as well.
+		- That path wrote FireHandler's _fireMap, a plain Dictionary, and sent
+		  SyncAddFire RPCs, neither of them guarded. It could corrupt the fire
+		  map exactly the way DoorCache was corrupted. FireManager.AddFire's
+		  try/catch turned the result into a Debug.LogError rather than a
+		  crash report, which is the likely reason it was never reported.
+		- Behaviour change to expect: delayed fires now show their particles.
+		  StartFireEffects skips particle spawning unless
+		  ThreadManager.IsMainThread(), and this MinEvent was the only
+		  off-thread caller in the fire system, so that check was false only
+		  for delayed fires. Any triggered_effect using AddFireDamage with a
+		  delayTime has been starting invisible fires until now.
+		- AddFire null-checks FireManager.Instance before running. Execute
+		  checks it before starting the timer, but with a configurable
+		  delayTime the world can be torn down in between.
+
+Version: 3.1.9.1528
+	Game Version: v3.1.0 (b14)
+	[ EntitySyncUtils - ItemValue Stats And Mod Serialization ]
+		- ItemValue gained a Stats array (ItemValue.Stat[]) holding special
+		  modifiers. EntitySyncUtils serializes an NPC into the pickup item's
+		  metadata when a companion is collected, so anything it does not write
+		  is lost when that NPC is put back down. Stats were not written, so a
+		  collected NPC's gear came back stripped of them.
+		- ItemValue.Stat is a struct of (PassiveEffects type, bool isBoosted,
+		  short value). Its constructor takes (_type, _base, _added) but stores
+		  only the sum and "was anything added", so the base/added split cannot
+		  be recovered. The three fields are round-tripped directly rather than
+		  through the constructor, which would have meant inventing a split.
+		- Mods were serialized as a bare item name, so a modded weapon returned
+		  with default mods: the mod's own quality, durability and Stats were
+		  all discarded. A mod now carries all four.
+		- Mods are also written positionally. Empty slots used to be skipped,
+		  so [scope, empty, silencer] came back as a two element array with the
+		  silencer at index 0. An empty slot is now an empty entry, preserving
+		  both array length and mod indexes. An item whose slots are all empty
+		  still serializes as an empty field, exactly as before.
+		- Mod ItemValues are rebuilt with the (id, _bCreateDefaultParts: false)
+		  constructor so the restored state is not overwritten by default parts.
+
+		[ Slot string format ]
+		- Each slot gained a sixth comma separated field:
+		      name,count,quality,useTimes,mods,stats
+		- Separator hierarchy, outermost first. Mods nesting their own stats
+		  means every level needs its own character:
+		      ';'  slots
+		      ','  fields within a slot
+		      '|'  mods within the mods field
+		      '@'  fields within one mod: name@quality@useTimes@stats
+		      '~'  stats within any stats field (a slot's own, or a mod's)
+		      ':'  fields within one stat: type:isBoosted:value
+		- Backward compatible in both directions. Strings written before this
+		  change have five fields and a name-only mods list; every field past
+		  the first is optional on read, and Stats is left null, which is the
+		  state a freshly constructed ItemValue already carries. An older build
+		  reading a new string ignores the extra field.
+		- An effect name this build no longer knows is dropped rather than
+		  parsed loosely: a failed Enum.TryParse would leave the type at
+		  PassiveEffects 0, which is a real effect, and would silently apply
+		  the wrong modifier to the restored gear.
+
+		[ Bug fixed while extending the format ]
+		- UseTimes and Quality were written and parsed at the current culture
+		  inside a COMMA delimited field. On any locale that formats decimals
+		  with a comma (de-DE, fr-FR, most of Europe), a UseTimes of 1.5 was
+		  written as "1,5", which split into two columns and corrupted every
+		  field after it in that slot - mods included. All numeric writes and
+		  parses in EntitySyncUtils are now CultureInfo.InvariantCulture. This
+		  affected the existing item level fields, not only the new mod ones.
+
+	[ LockPicking - A Successful Pick On A Cop Car Set Off The Alarm ]
+		- Picking a cntPoliceCar01 open left the alarm variant behind. The car
+		  became cntPoliceCar01AlarmLocked - jammed, loot list policeCarsBonus,
+		  policeCarAlarmPrefab - instead of the cntPoliceCar01PickedLockBonus
+		  it had correctly been downgraded to a moment earlier. Nothing was
+		  wrong with the block definition; it is what vanilla ships. The alarm
+		  was also not DowngradeEvent firing, which only runs from
+		  Block.OnBlockDamaged. The alarm block was simply being placed.
+		- XUiC_PickLocking.OnClose ran twice per pick. Its own last lines call
+		  windowManager.Close(ID), and GUIWindowManager.Close ->
+		  XUiWindowGroup.OnClose -> Controller.OnClose re-enters the method
+		  that called it.
+		- The second pass still saw the lock as solved. SphereLocks.Disable
+		  only did SetActive(false); Keyhole.LockComplete() was untouched, and
+		  GetComponent still resolves on an inactive object, so IsLockOpened()
+		  kept returning true. ResetLock() only ever ran from Enable().
+		- By then LockedFeature had been cleared, so the guard that keeps the
+		  generic block level downgrade out of the TEFeatureLockPickable path
+		  no longer applied, and that downgrade overwrote the block the
+		  feature had just placed. onSelfLockpickSuccess fired twice as well.
+		- Two fixes. SphereLocks.Disable now calls Keyhole.ResetLock() before
+		  deactivating, so a closed window never reports a solved lock; the
+		  null check on the component matters, because Init() calls Disable()
+		  before the Keyhole is attached. XUiC_PickLocking gained a `closing`
+		  flag around OnClose's body, in a try/finally so the non main thread
+		  early return still clears it - the re-entrant call now runs
+		  base.OnClose() and returns.
+
+		[ Block.LockpickDowngradeBlock is dead in V2 ]
+		- That downgrade preferred currentBlock.Block.LockpickDowngradeBlock
+		  and fell back to DowngradeBlock. The field still exists on Block,
+		  but nothing parses it from XML any more - the only
+		  "LockPickDowngradeBlock" string left in Assembly-CSharp belongs to
+		  TEFeatureLockPickable - so it is always air, and the fallback could
+		  only ever resolve to DowngradeBlock. On a block whose DowngradeBlock
+		  is a damage state (cars, safes) that is the wrong block to place on
+		  success. The dead branch has been removed.
+		- What remains of that swap now only runs on the ILockable path,
+		  secure doors and containers, where SetLocked(false) has already done
+		  the unlocking. It is A21 era leftover and worth revisiting - a
+		  secure wood door's DowngradeBlock is its damaged variant - but it
+		  was left alone rather than changing door behaviour as part of a cop
+		  car fix.
+
+	[ Config - Two Region File Guards Now Ship Off ]
+		- RegionFileOptimizeLayoutLock and WarnRenderMapLiveServer now default
+		  to false in Config/blocks.xml. Neither patch changed; they are opt
+		  in now, and setting either back to true restores the previous
+		  behaviour exactly.
+		- RegionFileOptimizeLayoutLock serializes RegionFileV2.OptimizeLayout
+		  against chunk reads and writes. Vanilla runs that compaction without
+		  the region file's instance lock, so a chunk load overlapping it can
+		  read garbage ("EXCEPTION: In load chunk" / "Wrong chunk header!")
+		  and the chunk is then deleted and regenerated. Off by default now
+		  puts it in line with RegionFileLoadChunkLock, the other region file
+		  lock, which has always shipped off.
+		- WarnRenderMapLiveServer is dedicated server only and log only. It
+		  warns when rendermap or the web map's full render runs while a game
+		  is loaded, which opens a second region file reader over the live
+		  save and can tear chunk reads. Turn it on when diagnosing chunks
+		  that keep coming back regenerated on a server that renders maps.
+
+Version: 3.1.8.1454
+	Game Version: v3.1.0 (b13)
+	[ ErrorHandling - FixOrphanedPoweredTileEntities Deleted Working Power Sources ]
+		- Field report: placing a generator and switching it on logged
+		  "dropped an orphaned powered tile entity ... (block is not powered)",
+		  then "TileEntityPowerSource not found", then an unhandled
+		  NullReferenceException in TileEntityPowerSource.CurrentFuel while the
+		  power source window was binding. The tile entity was not corrupt; the
+		  guard deleted it.
+		- Root cause: both halves of the guard tested "block is BlockPowered".
+		  BlockPowerSource does not derive from BlockPowered - it derives
+		  straight from Block - so BlockGenerator, BlockSolarPanel and
+		  BlockBatteryBank all failed the test and were treated as orphans.
+		  SCore's own BlockPoweredWorkstationSDX (a BlockWorkstation hosting a
+		  TileEntityPoweredWorkstationSdx) had the same shape and was equally
+		  exposed.
+		- The Chunk.save sweep removes from the chunk's live tile entity list,
+		  not from a serialization copy, so this was not merely "skip writing
+		  it" - the tile entity was destroyed in the running game. That is why
+		  the UI threw immediately afterwards: the window had bound to a tile
+		  entity that had just been removed underneath it.
+		- Both guards now share OrphanedPoweredTileEntity.IsOrphaned, which
+		  tests Block.HasTileEntity - the engine's own "this block owns a tile
+		  entity" flag, set in the constructors of BlockPowered,
+		  BlockPowerSource and BlockWorkstation alike. That matches the actual
+		  corruption case (a block overwritten raw by a decoration pass, so the
+		  position is air or plain terrain and owns no tile entity at all) and
+		  needs no class whitelist kept in sync as blocks are added.
+		- The predicate is deliberately conservative: anything that claims a
+		  tile entity is left alone even if the pairing looks odd. Leaving a
+		  questionable pair in place is no worse than vanilla, while dropping
+		  it destroys player equipment.
+		- Corrected an inaccurate comment on the load-side guard: it claimed
+		  CreatePowerItem casts the block to BlockPowered and throws. It does
+		  not - it dispatches on PowerItemType, and there is no
+		  "castclass BlockPowered" anywhere in Assembly-CSharp. The real path
+		  is InitializePowerData leaving PowerItem null and CheckForNewWires
+		  then dereferencing it.
+		- DATA LOSS WARNING: any generator, solar panel or battery bank already
+		  swept in an earlier session is gone from the save. The block remains,
+		  but its fuel and wiring state are not recoverable by this fix.
+
+	[ NPCs - Pathing Cube Configuration Not Being Read ]
+		- Follow-up to the composite tile entity migration below. That work was
+		  a prerequisite, not a regression: while the cubes extended BlockSign
+		  they had no tile entity at all, so every
+		  "GetTileEntity(pos) as TileEntityComposite" in the scan returned null
+		  and SetupAutoPathingBlocks bailed before reading anything. The read
+		  path could not have worked in 3.0 under the old base class. These are
+		  the bugs that were sitting behind it.
+		- PathingCode latched permanently on an empty cube. The method set
+		  PathingCode to -1 before checking whether the sign had any text, and
+		  the guard at the top treats any non-zero code as "already
+		  configured". A cube whose text had not synced yet (client) or had
+		  been lost with the old tile entity therefore locked the NPC out of
+		  every later re-scan - permanently, since the cvar is saved with the
+		  entity. Now bails before writing anything when the sign is empty.
+		  Fixed in EntityAliveSDX, EntityAliveSDXV4 and EntityEnemySDX;
+		  EntityNPCBandit already had the guard and needed no change.
+		- The PathingBlocks entity class property was silently ignored.
+		  EntityUtilities.ConfigureEntityClass resolved the entity through
+		  World.GetEntity(entityId), but SetupAutoPathingBlocks runs from
+		  PostInit and from the spawn cubes, both before the entity is in the
+		  world. The lookup returned null, the list came back empty, and the
+		  hardcoded { PathingCube, PathingCube2 } default was used every time.
+		  Added an EntityAlive overload and pointed all four callers at it; the
+		  int overload now delegates to it and is still used by the callers
+		  that genuinely run after the entity is in the world.
+
+	[ NPCs - Runtime Pathing Code Waypoint Scan ]
+		- ModGeneralUtilities.ScanForTileEntityInChunksListHelper is the other
+		  half of the feature: SetupAutoPathingBlocks stores the code, this is
+		  what EAIWanderSDX and the Utility AI patrol tasks call through
+		  EntityUtilities.GetNewPositon to pick the next waypoint. It had never
+		  been updated for the "task=Wander;pc=3" sign format and was only
+		  reachable now that pathing cubes have composite tile entities.
+		- A non-zero pathing code could never match. The matcher ran
+		  code.ToString() against text.Split(','), which expects the sign to be
+		  a bare comma-separated code list ("3,4"). "task=Wander;pc=3" is a
+		  single element and never equals "3", so an NPC with a code assigned
+		  found no waypoints at all. Now parsed with PathingCubeParser, with a
+		  fallback to the bare list so cubes authored in the older format keep
+		  working.
+		- The block name filter was commented out, so lstBlocks was accepted,
+		  defaulted and then never used. While cubes had no tile entity this
+		  was masked; now that they are composites, every vanilla sign in the
+		  surrounding nine chunks also carries a TEFeatureSignable and would
+		  have been treated as a waypoint. Restored as a live check, with an
+		  ischild skip.
+		- Null-guarded signText, matching the setup half.
+		- Unchanged and worth knowing: maxDistance still defaults to -1 and
+		  GetNewPositon does not pass one, so the scan covers all nine chunks
+		  (roughly 144x144 blocks). Far less harmful now that only pathing
+		  cubes qualify, but an NPC can still choose a distant waypoint.
+
+
+
+Version: 3.1.6.1507
+	Game Version: v3.1.0 (b13)
+	[ Blocks - Composite Tile Entity Migration: Pathing Cubes, Spawn Cubes, Sign Portals ]
+		- Field report (arramus): loading a POI containing SCore pathing cubes
+		  logged "TileEntityComposite.ReadLegacySignIntoComposite: failed to
+		  convert legacy TE data into a composite TE.", then "Skipping loading
+		  of active block data for <prefab>" and a NullReferenceException in
+		  Prefab.readTileEntities - once per affected cube.
+		- Root cause: BlockPathFinding, BlockSpawnCubeSDX and BlockPortal2 all
+		  extended BlockSign. The game abandoned that class in 3.0: no vanilla
+		  block uses it any more (0 blocks, against 805 now declaring
+		  CompositeFeatures), and it neither sets HasTileEntity nor creates a
+		  tile entity. Every "GetTileEntity(pos) as TileEntityComposite" in
+		  these three blocks therefore returned null, and vanilla's legacy
+		  sign-to-composite migration refuses to convert a saved sign whose
+		  block is not a BlockCompositeTileEntity - so it returned null and
+		  Prefab.readTileEntities dereferenced it.
+		- This was not cosmetic. The legacy tile entity holds the sign text,
+		  and for these blocks the sign text IS the programming (task=, buff=,
+		  pc=, ec=, eg=). Every failed conversion silently discarded a cube's
+		  configuration, so NPCs in those POIs loaded with no orders.
+		- All three blocks now extend BlockCompositeTileEntity and declare
+		  their features in XML. The edit / lock / unlock / keypad commands
+		  come from TEFeatureSignable and TEFeatureLockable, which carry their
+		  own owner and ACL checks, so a large amount of hand-rolled (and
+		  unreachable) command plumbing was deleted with them.
+		- Side effect worth knowing when checking existing POIs: BlockSign also
+		  stamped a raw duplicate of itself UpwardsCount cells above, defaulting
+		  to 1 and independent of MultiBlockDim. That is why a cube declared
+		  "1,1,1" visually occupied two blocks. Off the BlockSign base it is
+		  genuinely one cell, so already-placed cubes lose their phantom upper
+		  cell. This also explains the long-standing "at 1,2,1 it caused issues
+		  with destroying blocks" note in PathingBlocks.xml.
+		- Pairs with FixLegacyTileEntityNullChunk (below), which now becomes
+		  load-bearing rather than merely defensive: with the block-class check
+		  passing, the migration proceeds to SetOwner -> SetModified on a
+		  still-chunkless tile entity, which is exactly the null-chunk case
+		  that guard handles. Keep it enabled.
+
+		[ Blocks affected ]
+		- PathingCube (Class "PathFinding, SCore"): all five activation
+		  commands were unreachable, so the block offered no interact prompt
+		  at all.
+		- SpawnCube (Class "SpawnCubeSDX, SCore"): CheckForSpawn returned at
+		  its second line, so spawn cubes could never spawn anything.
+		  Activation stays restricted to the prefab editor / debug menu, so
+		  players still cannot retarget a POI's spawners in normal play.
+		- samplePortal05 (Class "Portal2, SCore"): OnBlockActivated returned
+		  before any command ran, and SetText(Location) was a no-op, so sign
+		  portals registered with PortalManager under an empty name and never
+		  linked to their pair.
+
+		[ Latent bugs fixed while migrating ]
+		- Spawn cube force-spawn never ran: the command is registered as
+		  "Trigger" but the handler tested for "trigger". Now compared
+		  case-insensitively.
+		- Spawn cube respawn guard was broken: the throttle was written from
+		  the original sign text instead of the text that had just received
+		  the entity id, discarding the id that the "is my entity still alive"
+		  check reads.
+		- Spawn cube configuration was clobbered on every chunk load:
+		  OnBlockEntityTransformAfterActivated unconditionally re-wrote the
+		  block's Config property over the sign, wiping the entity id and
+		  respawn throttle that CheckForSpawn had just stored. The Config seed
+		  now only applies when the sign is empty.
+		- Sign portal null reference removed: GetBlockActivationCommands
+		  looked up PersistentPlayerData for the lock owner and called
+		  IsAlly on it without a null check. A POI-placed portal has no owner,
+		  so this would have thrown the moment the block started working.
+		  Delegating the lock commands to TEFeatureLockable removes the whole
+		  owner/ACL computation.
+
+		[ XML - required for third party mods ]
+		- SCore's own blocks are already updated; no action is needed for
+		  PathingCube, SpawnCube, samplePortal05, or for any block that
+		  Extends one of them without overriding Class (CompositeFeatures is
+		  inherited through Extends, the same way the DropBox blocks inherit
+		  theirs from cntWoodWritableCrate).
+		- BREAKING for any third party block that sets Class to
+		  "PathFinding, SCore", "SpawnCubeSDX, SCore" or "Portal2, SCore"
+		  directly without extending an SCore block. A BlockCompositeTileEntity
+		  with no CompositeFeatures property throws during block init
+		  ("uses class BlockCompositeTileEntity but has no CompositeFeatures
+		  property"). Add the feature block to those definitions:
+
+		      <property class="CompositeFeatures">
+		          <property class="TEFeatureSignable">
+		              <property name="FontSize" value="110"/>
+		              <property name="LineCount" value="3"/>
+		              <property name="LineWidth" value="0.8"/>
+		              <property name="LineSpacing" value="1"/>
+		          </property>
+		          <property class="TEFeatureLockable"/>
+		      </property>
+
+		  TEFeatureSignable is required on all three (it stores the text).
+		  TEFeatureLockable is only needed where lock / unlock / keypad are
+		  wanted - SpawnCube omits it. All four sign values must be present
+		  and greater than zero or TEFeatureSignable logs an error, even on
+		  blocks whose model has no text mesh.
+		- Blocks that Extend SpawnCube but override Class to
+		  "SpawnCube2SDX, SCore" or "SpawnCubeRepeater, SCore" are unaffected:
+		  those derive from BlockMotionSensor, not from the composite base, so
+		  the inherited CompositeFeatures property is simply ignored.
+
+		[ Still to re-test ]
+		- Load a POI that previously logged ReadLegacySignIntoComposite errors
+		  and confirm both that the errors are gone AND that the NPCs actually
+		  receive their tasks - the errors disappearing alone does not prove
+		  the codes were recovered.
+		- Check an existing POI for holes or odd collision where cubes lost
+		  their phantom upper cell.
+		- Place a spawn cube, let its chunk unload and reload, and confirm it
+		  spawns exactly once.
+		- Place two samplePortal05 blocks and confirm they link by name, and
+		  that activating an outer cell of the 3x3x3 still teleports.
+
+Version: 3.0.40.1018
+	Game Version: v3.0.1 (b4)
+	Re-build 3.1.6.1010 against 3.0.1 stable.
+
+Version:  3.1.6.1010 ( Experimental )
+	Game Version: v3.1.0 (b11)
+	[ EntityAliveSDX ]
+		- Fixed an issue where sphereii was an idiot and set_Title to not implemented.
+
+	
+
+Version: 3.1.3.1815 ( experimental )
+	- Fix run-time linking against 3.1.x
+	
+	[ ErrorHandling - Legacy Prefab Sign Migration Null Chunk Guard ]
+		- Loading a prefab containing a legacy-format sign threw a
+		  NullReferenceException and the game skipped ALL of that prefab's
+		  active block data ("Skipping loading of active block data for
+		  <prefab>"), so its signs, containers and other tile entities
+		  never loaded.
+		- Root cause is a vanilla bug in the sign-to-composite migration:
+		  Prefab.readTileEntities -> TileEntityLegacyUtils
+		  .ReadLegacySignIntoComposite builds a chunkless TileEntityComposite
+		  and immediately calls SetOwner -> SetModified -> setModified, which
+		  (on a host) builds a NetPackageTileEntity. That reads
+		  TileEntity.blockValue - a computed property, this.chunk.GetBlock(..)
+		  - and the chunk is null during a prefab read. Vanilla forgets to
+		  set bDisableModifiedCheck on this path the way its other chunkless
+		  construction paths do.
+		- New prefix on TileEntity.setModified returns early when the tile
+		  entity has no chunk. A chunkless TE only exists mid-read and has no
+		  chunk-scoped context to broadcast (SetChunkModified already
+		  null-guards chunk), so skipping it is safe and lets legacy prefabs
+		  load their tile entities instead of dropping them. Fixes every
+		  legacy prefab, not just ones re-saved in the current editor.
+		- New ErrorHandling property in blocks.xml:
+		  FixLegacyTileEntityNullChunk (default true).
+
+	[ ErrorHandling - Orphaned Powered TE: Save-Side Sweep + Spawn Cube Hardening ]
+		- Follow-up to the load-side guard below. Root-caused the orphan's
+		  origin: powered tile entities are NOT stored in prefabs
+		  (IsTileEntitySavedInPrefab is false for BlockPowered), so vanilla
+		  regenerates them from the block via OnBlockAdded during
+		  Prefab.CopyIntoLocal - on the generation thread. The mismatch is
+		  created when the spawn cube's block later leaves without its TE
+		  (a decoration overwrite during generation, or the cube's own
+		  self-destruct), and the corrupt {non-powered block + trigger TE}
+		  is written straight to the region file at generation time, before
+		  the chunk is ever loaded. That is why it reproduces on brand-new
+		  worlds.
+		- Save-side sweep: a prefix on Chunk.save drops orphaned powered TEs
+		  from the tile entity list before serialization, so a chunk
+		  corrupted during generation is never written to disk or sent to
+		  clients. Combined with the load-side guard (which heals chunks
+		  already corrupt on disk), new corruption stops being produced and
+		  old corruption is repaired on contact. Removal is a plain
+		  collection drop with no world side effects, safe on the save
+		  thread. Reuses the FixOrphanedPoweredTileEntities flag.
+		- BlockSpawnCube2SDX self-destruct hardening: DestroySelf now removes
+		  its TileEntityPoweredTrigger explicitly (on the main thread, via a
+		  deferred task if called off-thread) BEFORE damaging the block, so
+		  the trigger TE and the block can never desync even if the block
+		  change downgrades to a non-powered block or races a background
+		  save. The "keep" path returns early and leaves the cube (and its
+		  valid TE) in place.
+
+	[ ErrorHandling - Orphaned Powered Tile Entity Chunk Protection ]
+		- Field reports (bdubyah, Thee_Legion): "EXCEPTION: In load chunk"
+		  with "Specified cast is not valid" out of
+		  TileEntityPoweredTrigger.CreatePowerItem when loading chunks
+		  containing NPC spawn cube POIs, on NEW worlds with all prior
+		  fixes installed.
+		- Root cause: CreatePowerItem casts the block at the tile entity's
+		  position to BlockPowered. A powered trigger TE can outlive its
+		  block - POI decoration overwrites blocks raw without firing
+		  OnBlockRemoved, so a TE created when a prefab placed a spawn cube
+		  (BlockMotionSensor.OnBlockAdded) survives at a position whose
+		  block is now air or unpowered. The cast throws during Chunk.read
+		  and ChunkSnapshotUtil.LoadChunk responds by DELETING the entire
+		  chunk - POI, player builds and NPCs included. The 3.0.31 spawn
+		  cube fix closed the SetBlock-routed paths but could not cover raw
+		  decoration overwrites, which never notify the block.
+		- New prefix on TileEntityPowered.OnReadComplete: if the block at the
+		  TE's position is not a BlockPowered, the whole read-completion is
+		  skipped (a null PowerItem is a state vanilla already tolerates -
+		  client side powered TEs never have one), a warning names the
+		  position and block, and the orphaned TE is removed on the main
+		  thread so it is not saved again. The chunk loads normally. Covers
+		  every powered TE type and any mod's stale powered tile entities,
+		  not just SCore's spawn cubes.
+		- The guard sits at OnReadComplete, not the deeper InitializePowerData:
+		  OnReadComplete runs InitializePowerData (whose CreatePowerItem casts
+		  the block to BlockPowered and throws) AND then CheckForNewWires
+		  (which dereferences the null PowerItem and throws). Guarding only
+		  the init left the second call to NRE (reported by bdubyah), so the
+		  guard covers the whole method; base.OnReadComplete is empty, so
+		  skipping it for an orphan loses nothing.
+		- New ErrorHandling property in blocks.xml:
+		  FixOrphanedPoweredTileEntities (default true).
+
+Version: 3.0.36.1849
+
+	[  EntityAliveSDX / EntityAliveSDXV4 Save Record Hardening ]
+		- NPC records are now written as a versioned, component-framed section
+		  (identity, quest journal, patrol, buffs/progression, weapon, loot)
+		  instead of one fragile sequential stream. Each component serializes
+		  into its own length-prefixed frame, so a component that fails to
+		  write is dropped whole (with an error log) instead of half-written,
+		  and a component that fails to read is skipped without misaligning
+		  the ones after it. Previously a mid-write failure in Buffs (where
+		  hired/leader cvars live) silently corrupted everything after it -
+		  on reload the NPC lost its owner and wandered off or despawned,
+		  reported by users as NPCs disappearing across save/load.
+		- Guards against a vanilla chunk killer: EntityCreationData stores
+		  each entity's data behind a ushort length prefix but writes the full
+		  byte array. Any entity record over 65,535 bytes saves a wrapped
+		  around length, and the next Chunk.load misparses the chunk's entity
+		  list - ChunkSnapshotUtil.LoadChunk then DELETES the whole chunk
+		  (NPC, player builds and all). Long-lived NPCs with big quest
+		  journals, cvar-heavy buffs and full backpacks can plausibly cross
+		  that limit. The new writer measures the total record and sheds
+		  components to stay under it - quest journal first, then
+		  buffs/progression, loot last - logging each drop, so the chunk
+		  always stays loadable.
+		- Old saves load transparently via a legacy fallback reader (records
+		  upgrade to the new format on their next save). Note: not forward
+		  compatible - a downgraded SCore cannot read records saved by this
+		  version, and server/client must run matching SCore versions for
+		  NPC spawn sync.
+		- Also fixed a latent asymmetry: progression was written only when
+		  present but read unconditionally; the new format stores an explicit
+		  flag.
+		- New ErrorHandling property in blocks.xml: LogOversizedEntityData
+		  (default true) logs an error naming ANY entity (vanilla or modded)
+		  whose record exceeds the 65,535 byte limit, so oversized records
+		  can be traced before their chunk dies.
+
+	[ ErrorHandling - Companion HUD List Drift Fix ]
+		- Vanilla XUiC_CompanionEntryList.RefreshPartyList repositions its
+		  own grid by (party members - 1) rows PLUS (companions - 1) rows.
+		  The party term is correct (the companion grid shares its XML
+		  position with the party grid and must sit below the party rows),
+		  but the companion term shifts the whole companion block down one
+		  extra row for every companion beyond the first - on the
+		  top-anchored, downward-stacking HUD grid the list visibly marches
+		  down the screen as companions are added. XUiC_PartyEntryList never
+		  repositions itself, which is why party entries don't drift.
+		- New postfix recomputes the offset with only the party-row term,
+		  keeping companions stacked directly under the party rows. Reads
+		  the row height from the grid's cell_height instead of vanilla's
+		  hardcoded 40 pixels, so custom HUD layouts with different row
+		  heights lay out correctly too.
+		- Not fixable from XML alone: the 40px step and the companion count
+		  offset are hardcoded in the vanilla controller.
+		- New ErrorHandling property in blocks.xml:
+		  FixCompanionEntryListDrift (default true).
+
+	[ ErrorHandling - Chunk Load Path Race Protection ]
+		- Second thread-safety hole in the same family as the OptimizeLayout
+		  race: RegionFileManager's chunk-load path shares ONE read buffer,
+		  cached decompressor and load stream across every caller with no
+		  locking. Chunk loads normally run on the generation thread only,
+		  but chunk resets (regionreset / worldchunkreset console commands,
+		  ActionResetRegions game events - commonly scheduled on live
+		  servers) load chunks from the MAIN thread through the same shared
+		  reader. Overlapping loads tear the shared buffers mid
+		  decompression ("EXC invalid distance too far back", "Wrong chunk
+		  header!") and the failed load then deletes the chunk - and every
+		  NPC standing in it - from the region file.
+		- New Harmony prefix/finalizer holds a per-instance lock across all
+		  of ChunkSnapshotUtil.LoadChunk (the shared load stream is still
+		  being parsed by chunk.load after the raw read returns, so the
+		  lock must span the whole method).
+		- New ErrorHandling properties in blocks.xml:
+			- RegionFileLoadChunkLock (default true) enables the guard.
+			- LogRegionFileLoadChunkLock logs each time a load had to wait
+			  on a concurrent load (each hit is a prevented corruption);
+			  can be noisy during mass chunk resets.
+
+	[ ErrorHandling - rendermap Live Server Warning ]
+		- The web panel / rendermap full-map render opens a SECOND
+		  RegionFileManager over the live save's region files. Region file
+		  locking is per-instance and files open shared, so its reads tear
+		  against the live manager's writes, its failed loads delete chunks
+		  from the live save, and its cleanup compacts region files the
+		  live manager has cached sector tables for.
+		- SCore now logs a clear warning when a full map render starts
+		  while a game is loaded: run rendermap with no players connected,
+		  or take a backup first. Warning only; the render is not blocked.
+		- The patch resolves its target lazily and disables itself on
+		  clients (MapRenderer needs Webserver.dll, which only ships with
+		  dedicated servers), so client installs are unaffected.
+		- New ErrorHandling property in blocks.xml: WarnRenderMapLiveServer
+		  (default true).
+
+
+
+	[ ErrorHandling - RegionFileV2.OptimizeLayout Race Protection ]
+		- Field reports of chunk corruption ("EXCEPTION: In load chunk",
+		  "Wrong chunk header!", negative read counts, "Memory stream is not
+		  expandable") traced to a base-game thread-safety hole: vanilla
+		  RegionFileV2.OptimizeLayout compacts a region file in place
+		  (truncate + rewrite) without taking the instance lock that
+		  ReadData/WriteData hold, and the chunk load path (GenerateChunksThread
+		  -> RegionFileManager.GetChunkSync) takes no saveLock. A chunk load
+		  overlapping a compaction on the save thread reads garbage from the
+		  half-rewritten file, and the failed load then DELETES that chunk from
+		  the region file and regenerates it - losing player builds.
+		- New Harmony prefix/finalizer pair holds the region file's instance
+		  lock for the whole compaction, making it mutually exclusive with the
+		  already-locked reads and writes. Does not repair regions corrupted
+		  before the patch, and cannot protect against the process being killed
+		  mid-compaction.
+		- New ErrorHandling properties in blocks.xml:
+			- RegionFileOptimizeLayoutLock (default true) enables the guard.
+			- LogRegionFileOptimizeLayoutLock logs each time a compaction had
+			  to wait on a concurrent read/write - every hit is a corruption
+			  event that was prevented, useful for confirming the race in the
+			  field.
+
+	[ ErrorHandling - Mute Sign Data Manager Renderer Warnings ]
+		- Pathing cubes and other "programming" sign blocks have no visual
+		  renderer on purpose, so vanilla SignDataManager.TryApplyRenderingData
+		  spammed "Unexpected case in Sign Data Manager: signRenderer is null"
+		  for every update. Vanilla already skips null renderers safely; the
+		  warning was the only effect.
+		- A feature-gated prefix reruns the identical vanilla logic without
+		  logging for null signRenderer / signRenderer.Renderer entries.
+		- New ErrorHandling property in blocks.xml: MuteSignRendererWarnings
+		  (default true). Set to false to restore the vanilla warnings.
+
+Version: 3.0.31.1019
+	[ SphereII Disable Special Attack ]
+		- A small modlet to disable the ranged special attacks on Chuck and the Rancher, so they only melee.
+			- Removes Chuck's ranged boulder-throw attack (AITask + Action1 on its hand item)
+			- Removes the Rancher's ranged insect-swarm attack (AITask + Action1 on its hand item)
+
+	[ NPC Utility AI - CrouchOverride Cvar to Pin Commanded Stance ]
+		- NPC crouching was mirrored from the leader's stance every UAI tick
+		  (SetCrouching in Scripts/UtilityAI/UAISCoreUtils.cs and Features/NPCv4/
+		  UtilityAI/Utils/CombatUtils.cs), so any stance set externally (e.g. a
+		  voice-command mod telling a hired NPC to take cover) was overwritten on
+		  the next tick regardless of which UAI task called SetCrouching.
+		- Both SetCrouching chokepoints now check a "CrouchOverride" entity cvar
+		  before applying the mirrored value: 0/absent = unchanged (mirror leader,
+		  default behavior), 1 = force crouch, 2 = force stand. Since every call
+		  site funnels through these two methods, this covers Follow, Idle, Loot,
+		  ApproachSpot, AttackTargetEntity, BackupFromTarget, and MoveToExplore
+		  without any changes to the individual UAI tasks.
+		- Lets other mods pin a hired/commanded NPC's stance independently of the
+		  player's own stance, persisting across save/load since it's a normal
+		  entity cvar. Requested by the NPCVoiceControl mod team for squad-tactics
+		  stance commands.
+
+	[ BlockSpawnCube2SDX - Chunk Corruption From Stale TileEntityPoweredTrigger ]
+		- Revisiting a POI whose spawn cube had already fired could corrupt the
+		  chunk on save/reload, later throwing "Specified cast is not valid" out
+		  of TileEntityPoweredTrigger.CreatePowerItem while loading the chunk
+		  (Chunk.load -> TileEntityPowered.OnReadComplete ->
+		  InitializePowerData -> CreatePowerItemForTileEntity), and could snowball
+		  into further corrupted regions afterward.
+		- BlockSpawnCube2SDX extends BlockMotionSensor, which creates a
+		  TileEntityPoweredTrigger in OnBlockAdded, but the class never overrode
+		  OnBlockRemoved to clean it up - unlike every other custom TE-owning
+		  block in this codebase (BlockPoweredWorkstation, BlockDecoAoE,
+		  BlockMortSpawner, the water blocks, the portal blocks), which all
+		  explicitly remove their tile entity on removal. The leftover TE could
+		  survive block destruction and get serialized into the chunk save,
+		  mismatched against whatever block now occupies that position.
+		- UpdateTick also unconditionally called DestroySelf() after every tick
+		  regardless of whether MaxSpawned had been reached, immediately firing a
+		  SetBlockRPC(meta++) followed back-to-back by DestroySelf's own
+		  DamageBlock/SetBlockRPC call on the same block position in the same
+		  tick - two rapid consecutive writes to one position while its TE still
+		  existed, the likely source of the save race. This also silently broke
+		  MaxSpawned > 1 configs, which died after their first spawn instead of
+		  continuing to spawn.
+		- Fixed by adding an explicit OnBlockRemoved override that calls
+		  _chunk.RemoveTileEntityAt<TileEntityPoweredTrigger>(...), and by only
+		  calling DestroySelf() once meta >= MaxSpawned, rescheduling via
+		  GetTickRate() otherwise so multi-spawn configs actually spawn more than
+		  once before the block destroys itself.
+
+[ Change Log ]
+Version: 3.0.28.1654
+
+	[ NPC Dialogue - Lockup After Declining Hire Offer or Early ESC/Tab Close ]
+		- Declining the "Hire for N Dukes" prompt (or closing the dialogue early with ESC/Tab
+		  instead of finishing it normally) left the NPC's second conversation completely
+		  dead: no dialogue menu appeared at all, and the player stayed movement-locked until
+		  forcing the dialogue closed again with ESC/Tab.
+		- Root cause traced through the decompiled engine: EntityAliveSDX.OnEntityActivated
+		  only sends a new talk lock request when
+		  `!windowManager.IsModalWindowOpen() || GetModalWindow().Id == "radial"` - if the
+		  window manager still thinks a modal window is open from the previous conversation,
+		  every later interaction attempt silently no-ops (no lock request, no dialog, no
+		  unlock, so the player also stays movement-locked - matching both symptoms).
+	
+
+	[ Crafting - CraftingManager.GetRecipe(hash) No Longer Valid ]
+		- The engine's CraftingManager no longer exposes a way to fetch a specific Recipe by
+		  its hash code alone, breaking RecipeHasIngredients (Scripts/Buffs/RecipeHasIngredients.cs),
+		  which relied on `CraftingManager.GetRecipe(recipeHash)` to look back up the exact
+		  recipe that was just crafted.
+		- RecipeStackOutputStackOnRecipeCrafted (Features/PassiveEffectHooks/Harmony/Triggers/
+		  OnRecipeCrafted.cs) now also stamps a "RecipeName" string metadata entry
+		  (__instance.recipe.GetName()) alongside the existing "Recipe" hash-code metadata.
+		- RecipeHasIngredients.IsValid reads both back: it calls
+		  CraftingManager.GetAllRecipes(recipeName) to get every recipe registered under that
+		  name, then walks the results comparing GetHashCode() against the stored hash to find
+		  the exact recipe that was crafted (multiple recipes can share the same name, so the
+		  name alone isn't a unique enough lookup key).
+
+	[ NPC Corpse Bags - NullReferenceException Opening bagStorage Window ]
+		- Looting an NPC's dropped bag (BackpackNPC/EntityBackpackNPC) threw a
+		  NullReferenceException in XUiC_BagContainer's GetLockedSlotsFromStorage delegate
+		  (get_LockedSlots -> OnOpen) the moment the loot window opened. Root cause traced
+		  through the decompiled engine: Entity.OnLockedLocal resolves
+		  `LootContainer.GetLootContainer(GetLootList())` and passes it into
+		  XUiC_BagStorageWindowGroup.Open, which calls XUiC_BagContainer.SetBag(bag,
+		  lootContainer, ...) - vanilla SetBag silently no-ops (never assigns its Bag
+		  property) if either the bag or the resolved LootContainer is null. The window still
+		  opens regardless, so the later OnOpen chain always ran against a null Bag.
+		- EntityBackpackNPC.GetLootList() returns a separate `lootListOnDeath` field instead
+		  of the entity class's LootList property, and CopyPropertiesFromEntityClass() only
+		  populated that field from an entity-class property named "LootListOnDeath" - which
+		  the BackpackNPC entity_class (0-XNPCCore/Config/entityclasses.xml) never defines,
+		  only "LootList" (="playerBackpack"). So GetLootList() always returned an empty
+		  string for NPC bags, LootContainer.GetLootContainer("") resolved to null, and
+		  SetBag's guard silently swallowed the bag assignment - all while the player's own
+		  death backpack (plain vanilla EntityItem, no GetLootList override) worked fine.
+		- CopyPropertiesFromEntityClass() now falls back to the entity class's "LootList"
+		  property when "LootListOnDeath" isn't explicitly set, so NPC bags resolve the same
+		  loot container definition already configured for their contents/sizing and open
+		  without crashing.
+
+	[ Lock Picking - Cop Car Downgrading to Alarm Variant ]
+		- XUiC_PickLocking.OnClose: picking a lock successfully (on the ILockable path,
+		  LockedFeature == null) chose the downgrade block with
+		  `if (!LockpickDowngradeBlock.isair) blockValue = LockpickDowngradeBlock; else if
+		  (!DowngradeBlock.isair) blockValue = DowngradeBlock;` - prefer the pick-specific
+		  downgrade, fall back to the generic one only if it isn't set. For the cop car
+		  (cntPoliceCar01), LockpickDowngradeBlock is its safe "picked, bonus loot" variant
+		  and DowngradeBlock is its alarm-triggering variant, so this was already the correct
+		  preference order.
+		- Restored that preference order (a prior edit had turned the else-if into two
+		  sequential ifs, which reassigned blockValue to DowngradeBlock immediately after
+		  setting it to LockpickDowngradeBlock - LockpickDowngradeBlock could never actually
+		  win). With the fix, a successfully picked cop car now downgrades to its bonus-loot
+		  variant instead of the alarm variant that triggers a call.
+
+	[ Multiplayer - HarvestManager Loot Window Auto-Closing on Dedicated Server ]
+		- NetPackageHarvestInventoryData.ProcessPackage (dedicated-server client: opens a
+		  trader NPC's harvest inventory delivered from the server) built its own
+		  SCoreLootContainer with only a chunk reference and never set localChunkPos, so it
+		  defaulted to the chunk's bedrock corner - tens of meters from the player/NPC. The
+		  loot window's distance-based auto-close read that bogus position and closed the
+		  window (at a constant ~63m) the instant it opened, regardless of the player's real
+		  distance to the NPC. HarvestManager.GetOrCreate already carried the equivalent fix
+		  for the listen-server/local path (PositionAtEntity, stamping chunk/localChunkPos
+		  onto the NPC's live position) but it was never applied to this client-rebuilt
+		  container.
+		- HarvestManager.PositionAtEntity is now public, and
+		  NetPackageHarvestInventoryData.ProcessPackage calls it on the container right after
+		  construction, so the dedicated-server client path gets the same live-position fix.
+
+	[ Multiplayer - HarvestManager OpenContainer NullReferenceException on Dedicated Server ]
+		- EntityUtilities.ExecuteCMD's "OpenInventory" case branched only on
+		  ConnectionManager.IsServer to decide whether to open a trader NPC's harvest
+		  container directly (OpenContainer(player as EntityPlayerLocal, ...)) or request it
+		  from the server. IsServer is true for dedicated servers too, and
+		  DialogActionExecuteCommandSDX declares ActionType => AddBuff, which rides the
+		  vanilla dialog engine's buff-action replication - so this case also runs
+		  authoritatively on a headless dedicated server, where there is no EntityPlayerLocal
+		  at all. `player as EntityPlayerLocal` was always null there, and
+		  OpenContainer(null, ...) threw a NullReferenceException inside
+		  LocalPlayerUI.GetUIForPrimaryPlayer().
+		- Added a `player is EntityPlayerLocal playerLocal` guard inside the IsServer branch:
+		  if the replay's player isn't local (dedicated server, or a listen-server host
+		  replaying a remote guest's action), it's now a safe no-op instead of a crash - the
+		  owning client's own ExecuteCMD call (running in its own process, where IsServer is
+		  false) still sends the request packet independently. Listen-server hosts and real
+		  remote clients are unaffected.
+
+	[ Multiplayer - Weapon Swap Sync Fix ]
+		- NetPackageWeaponSwap.ProcessPackage: the server branch previously returned immediately
+		  without applying the swap or relaying it, so a client-initiated weapon swap only ever
+		  updated the sending client and was silently dropped everywhere else. The server now
+		  applies the swap to its own EntityAliveSDX like any other recipient, then relays the
+		  package to all other clients (excluding the original sender) so weapon swaps stay in
+		  sync across the whole server.
+
+Version: 3.0.25.912
+
+	[ NPC Interaction - Remove Trader Hours Restriction ]
+		- EntityAliveSDX.OnEntityActivated / EntityAliveSDXV4.OnEntityActivated: no longer call
+		  base.OnEntityActivated (EntityTrader), which gated the whole interaction behind
+		  TraderData.TraderInfo.IsTraderActivitiesOpen and showed a "come back later" tooltip
+		  instead of opening dialog/trade outside of trader hours. NPCs built on these classes
+		  aren't schedule-restricted vendors, so both methods now reproduce only the rest of the
+		  base behavior (the modal-window check and LockManager.Instance.LockRequestLocal call),
+		  letting NPCs talk and trade at any time of day.
+
+Version: 3.0.24.1327
+
+	[ Utility AI - Wander/Follow Recovery ]
+		- UAITaskWanderSDX: task instances are singletons (one per <task> XML element, shared by
+		  every entity using the package), so per-entity state (target, stuck count, redirect
+		  cooldown) is now tracked in entityId-keyed dictionaries instead of plain fields, which
+		  were being silently clobbered/shared across every wandering NPC. On blocked movement
+		  (wall/ledge/corner), NPCs now escalate through widening search attempts and redirect to
+		  a new target instead of getting stuck forever.
+		- UAITaskFollowSDX: while blocked, hired NPCs now retry pathing to their leader every 1s
+		  instead of only waiting out the full 5s teleport timer with no recalculation attempt.
+		- UAISCoreUtils.CheckJump: no longer runs its edge/ledge jump-safety check while the entity
+		  is on a Follow order, so it can no longer clear a following NPC's path out from under it.
+		- EntityAliveSDX/EntityAliveSDXV4: GetSurfaceY (terrain-plus-placed-blocks height lookup)
+		  is now public instead of private, so it can be reused by external callers.
+
+	[ Lock Picking - TEFeatureLockPickable Support ]
+		- Fixed a NullReferenceException when picking a block secured only by TEFeatureLockPickable
+		  (chests, cars, etc. without a full TEFeatureLockable) - the code resolved the feature but
+		  then called SetLocked() on a still-null TEFeatureLockable reference.
+		- TEFeatureLockPickable-backed blocks now route through SCore's own pick-lock minigame
+		  (XUiC_PickLocking) instead of vanilla's timer/break-chance UI, using the block's own
+		  configured lock-pick item. On success it replicates vanilla's own completion (marks
+		  fully unlocked, swaps to the configured downgrade block, fires the configured success
+		  event) instead of the ILockable-only SetLocked(false) path.
+
+	[ Quality - Debug Logging ]
+		- Re-enabled QualityTroublshooting.cs, a set of Harmony log taps across the crafting-quality
+		  pipeline (recipe queue input, tile entity sync, HandleRecipeQueue, AddCraftComplete) used
+		  to trace custom quality levels through crafting. Gated behind
+		  AdvancedItemFeatures.CustomQualityLevels, same as the rest of the custom quality system.
+
+Version: 3.0.16.732 
+
+	[ Prefabs ]
+		- Updated Cave Prefabs from Stallionsden.
+
+	[ DropBox ]
+		- Removed excessive debug logs
+
+	[ Lock Picking - Door Activation Command Migration ]
+		- Fixed lock picking no longer triggering on doors. The engine now prefixes
+		  BlockCompositeTileEntity.OnBlockActivated command names with the owning feature
+		  (e.g. "TEFeatureDoor:open" instead of the bare "open"), so
+		  BlockDoorSecurePatch.BlockDoorSecureOnBlockActivated's exact string match against
+		  "open" always failed and the door fell through to vanilla behavior. Updated the
+		  check to match "TEFeatureDoor:open".
+
+	[ Github ]
+		- Syncing all changes from Experimental
+
+Version: 3.0.8.709 [ Experimental ]
+
+	[ Fixes ] 
+		- Fixed an updated XUiC_MessageBoxWindowGroup.ShowOkCancel() call
+		- Recompiled to re-link against method parameter change.
+		- Renamed XUi to XUi_InGame for Larger Parties mod to properly expand the ui controller.
+
+Version: 3.0.6.626  [ Experimental ]
+
+	[ NPC Loot Containers - SCoreLootContainer Migration (Xyth) ]
+		- The engine's TileEntityLootContainer/TileEntityTrader classes changed enough that
+		  NPCs could no longer use them directly for their personal loot (bag) and harvest
+		  containers. Added a new minimal in-memory container, SCoreLootContainer
+		  (implements ITileEntityLootable + IInventory on top of TileEntity), that never
+		  attaches to a chunk or the world tile-entity system, so it can't trigger network
+		  packets or corrupt TraderData.
+		- EntityAliveSDX:
+			- lootContainer is now an SCoreLootContainer instead of a TileEntityLootContainer.
+			- _tileEntityTrader is now a TileEntityVendingMachine (TileEntityTrader was
+			  retargeted by the engine); removed the now-nonexistent entityId assignment on it.
+			- GetActivationCommands/OnEntityActivated were updated to the engine's new
+			  signatures (no more indexInBlockActivationCommands/Vector3i tePos). Activating a
+			  dead NPC now opens its lootContainer directly via EntityUtilities.OpenContainer
+			  instead of going through GameManager.TELockServer.
+			- BagItems population was moved out of CopyPropertiesFromEntityClass() into a new
+			  SetupBagItems(), called from PostInit() once bag/Buffs/inventory exist. NPCs
+			  don't get a bag by default (only EntityPlayer allocates one), so SetupBagItems
+			  also lazily creates a 45-slot Bag before adding items.
+			- The same BagItems-before-bag-exists NRE existed in EntityAliveSDXV4
+			  (Features/NPCv4), which still populated BagItems inline in
+			  CopyPropertiesFromEntityClass(). Applied the same SetupBagItems()/PostInit()
+			  fix there.
+			- Corpse drop (dropCorpseBlock) now reads the spawned corpse block's
+			  TileEntityComposite and copies items into its TEFeatureStorage feature instead
+			  of calling the removed CopyLootContainerDataFromOther on TileEntityLootContainer.
+			- Sign-based pathing code reads TEFeatureSignable off a TileEntityComposite instead
+			  of casting to the removed TileEntitySign.
+		- HarvestManager: switched its per-NPC harvest container from TileEntityLootContainer
+		  to SCoreLootContainer. Also fixed the harvest loot window auto-closing instantly:
+		  the container was created with only a chunk reference (localChunkPos defaulting to
+		  the chunk's bedrock corner, ~60m below the player), which tripped the loot window's
+		  distance-based auto-close. GetOrCreate now repositions the container's chunk/
+		  localChunkPos onto the NPC's current position on every call.
+		- EntityUtilities: lootContainer is no longer on the base EntityAlive, so every
+		  lootContainer read now casts the entity to EntityAliveSDX first. OpenContainer was
+		  reworked for the new scavenge-timer behavior on untouched containers: it now marks
+		  the container bWasTouched and calls XUiC_LootWindowGroup.OpenLooting() instead of
+		  SetTileEntityChest()+Open(), since forcing the window open before OpenLooting bound
+		  the tile entity caused a null-reference on close. Door lock/unlock helpers were
+		  updated to read TEFeatureLockable off a TileEntityComposite instead of casting to
+		  the removed TileEntitySecureDoor, and door-open state is now read directly from the
+		  block meta bit instead of the removed BlockDoor.IsDoorOpen().
+
+Version: 3.0.2.1557  [ Experimental ]
+	- Maaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaany fixes to get it to compile
+
+	[ Harmony Patch Fixes - API Migration ]
+		- Fixed several Harmony patches broken by upstream game API changes (invalid casts,
+		  renamed/retargeted methods, changed signatures):
+			- EntityEnemySDX.SetupAutoPathingBlocks(): replaced a direct `as TEFeatureSignable`
+			  cast with `TileEntityComposite.GetFeature<TEFeatureSignable>()`.
+			- ModGeneralUtilities.CheckContents(): added an SCoreLootContainer overload, since
+			  EntityAliveSDX.lootContainer can no longer be passed to the TileEntityComposite
+			  overload.
+			- SleeperVolumeSpawn: SleeperVolume.Spawn now returns bool and spawns entities
+			  asynchronously; patch retargeted to AddEnemyToWorld, extracting the entity from
+			  object[] __args.
+			- AudioClientPlay (0-SCore and SampleProject): Audio.Client.Play gained two new
+			  parameters; patch attributes/Prefixes updated to the new
+			  (int, string, float, float, int) signature. Also fixed a soundGoupName ->
+			  soundGroupName parameter typo in SampleProject's AudioClientPlay2.
+			- XUiC_LootWindowGroupOnOpen: XUiC_LootWindowGroup no longer declares its own
+			  OnOpen, so DeclaredMethod can't find it; switched to [HarmonyTargetMethod] with
+			  AccessTools.Method() to walk the inheritance chain.
+			- ParticlesOnBlocks Blocks.cs: Block.OnBlockDamaged now takes a BlockValueRef
+			  instead of a Vector3i; Postfix updated to read the position via
+			  _bvRef.BlockPosition.
+			- EntityFlyingEAITasks: EntityVulture no longer declares Init(int); switched to
+			  [HarmonyTargetMethod] targeting the full
+			  Init(int, EntityInstanceAssets, EModelInstanceAssets) signature.
+			- NoVehicleTake: EntityVehicle.GetActivationCommands was removed; replaced with a
+			  Postfix on AllowActivationCommand(ReadOnlySpan<char>, EntityPlayerLocal) that
+			  blocks the "take" command unless the vehicle is tagged takeable, a per-vehicle
+			  cvar override is set, or the PickUpAllVehicles cvar is enabled.
+
+	[ XML - Explosion / DamageBonus Property Format Migration ]
+		- All flat `Explosion.X` properties have been converted to the engine's new nested
+		  `<property class="Explosion">` block format, with any nested `DamageBonus.X`
+		  entries further promoted to their own `<property class="DamageBonus">` block.
+		  Updated:
+			- Z-SphereIIDebugging/Config/items.xml: thrownCryoGrenade,
+			  thrownAmmoMolotovCocktailExtinguish (including its Action0/Action1 blocks).
+			- Z-SphereIIDebugging/Config/entityclasses.xml: the 4x4 truck entity.
+			- 0-XNPCCore/Config/entityclasses.xml: ZombieCop (including the DamageBonus.earth
+			  promotion).
+			- 0-XNPCCore/Config/items.xml: RPG ammo Action1 (including the DamageBonus.water
+			  promotion), crossbow bolt ammo Action1.
+		- Stray/duplicate properties were merged in the process (e.g.
+		  thrownAmmoMolotovCocktailExtinguish had an Explosion.BlockDamage separated from its
+		  other explosion properties), and zero-value DamageBonus suppressions no longer
+		  needed by the new engine were removed.
+
+	[ Block Upgrade Repair - ReadFromContainers Item Count Lookup Fix ]
+		- Fixed block upgrades never completing (resources never consumed, block never
+		  swapping) whenever BlockUpgradeRepair's ReadFromContainers was enabled.
+		- Root cause: RemoveRequiredResource and CanRemoveRequiredResource were reading
+		  the upgrade item count with `block.Properties.Values.TryGetValue("ItemCount", ...)`,
+		  a flat lookup. The game actually stores it nested under the UpgradeBlock class
+		  (`<property class="UpgradeBlock"><property name="ItemCount" .../></property>`),
+		  in `Properties.Classes["UpgradeBlock"]`, not the flat `Properties.Values`
+		  dictionary. The lookup therefore always failed, which made CanRemoveRequiredResource
+		  silently deny every swing (blockUpgradeCount never advanced), so the upgrade never
+		  fired and no resources were ever touched.
+		- Fix: both methods now use `block.Properties.TryGetValue(Block.PropUpgradeBlockClass,
+		  Block.PropUpgradeBlockItemCount, out var itemCountStr)` to read the nested property
+		  correctly.
+		- Also fixed CanRemoveRequiredResource only allowing the upgrade when nearby
+		  containers alone held the *full* required item count, ignoring any amount already
+		  in the player's inventory/bag. It now checks containers against the remaining
+		  deficit (`quantity - heldCount`) instead.
+		- Also fixed RemoveRequiredResource's container fallback, which re-requested the
+		  full item count from inventory then bag (DecItem is partial, not atomic, so this
+		  could over-consume across calls) and counted the bag's matching items toward the
+		  requirement without actually removing them. It now tracks a single running
+		  "remaining" total across inventory -> bag -> containers, and reports failure
+		  honestly if the combined total still falls short.
+
+Version: 2.6.58.744
+	[ Item Degradation - Quality Curve Support (Linear / Quadratic / Cubic) ]
+		- GetDurabilityForQuality now accepts an optional curve parameter controlling
+		  how durability scales across quality tiers.
+		- GetValue reads a DegradationCurve XML property from the item class and passes
+		  it through to GetDurabilityForQuality. Defaults to "linear" if not set, so
+		  all existing items are unaffected.
+		- Supported values for DegradationCurve:
+		    linear    — equal spacing between tiers (existing behaviour, default)
+		    quadratic — t^2 curve; lower tiers degrade faster, higher tiers last longer
+		    cubic     — t^3 curve; even steeper advantage for high-quality items
+
+		Example values with DegradationMaxUse="1000,6000" param1="1,6":
+
+		  Quality    Linear    Quadratic    Cubic
+		  Q1         1000      1000         1000
+		  Q2         2000      1200         1040
+		  Q3         3000      2000         1370
+		  Q4         4000      3400         2080
+		  Q5         5000      5200         3560
+		  Q6         6000      6000         6000
+
+		Configuration example (items.xml / item_modifiers.xml):
+		    <property name="DegradationMaxUse" value="1000,6000" param1="1,6"/>
+		    <property name="DegradationCurve"  value="quadratic"/>
+
+		Works with both vanilla quality (1-6) and extended quality (1-600) because
+		the curve is applied to the normalized 0-1 step before scaling to the
+		durability range, so the shape is identical regardless of the quality scale.
+
+	[ Item Degradation - GetValue Metadata Cache Removed ]
+		- Removed the metadata write-back in GetValue that was caching the computed
+		  DegradationMaxUse result into item metadata. This caused two bugs:
+		  1. Changing DegradationMaxUse in XML had no effect on existing items because
+		     the stale cached value was always returned first on subsequent calls.
+		  2. Quality scaling was silently broken: quality=0 items were clamped to minQuality
+		     and cached the minimum durability value, making every quality tier degrade at
+		     the Q1 rate regardless of the item's actual quality.
+		- Also removed the metadata read. XML is now always authoritative for
+		  DegradationMaxUse and DegradationPerUse — no per-item cache can interfere.
+
+	[ Item Degradation - GetPercentUsed Division by Zero Guard ]
+		- Added a guard in GetPercentUsed for when GetMaxUseTimes returns 0.
+		  Previously this caused a float division by zero (NaN), which silently caused
+		  the ItemPercentUsed LT 1 requirement to evaluate as false, blocking
+		  DegradeItemValueMod from ever firing even when CanDegrade was true.
+		- Now returns 0f when maxUse is 0, treating the item as unused.
+
+	[ Item Degradation - Params1 Missing Quality Range Warning ]
+		- GetValue now uses TryGetValue instead of the direct [] accessor on Params1.
+		  Item types that do not populate Params1 for appended properties previously
+		  caused a silent -1 return (GetMaxUseTimes=0, CanDegrade=false, no degradation).
+		- When param1 is missing on a comma-separated DegradationMaxUse value, a log
+		  warning is now emitted and the first value in the range is used as a flat
+		  integer fallback so degradation still fires.
+
+	[ Item Degradation - Dew Collector Debug Logging ]
+		- Added and subsequently removed temporary per-slot debug logging in
+		  TileEntityDewCollectorHandleModChanged to diagnose the above issues.
+		  Confirmed the patch fires on every production cycle (~2x per second),
+		  and that quality-scaled maxUseTimes (Q1=1000, Q3=3000, Q6=6000) is
+		  computed correctly once the cache and Params1 issues were resolved.
+
+	[ SphereII Item Mod Degradation - items.xml Set vs Append Fix ]
+		- Changed DegradationMaxUse and DegradationPerUse overrides for tool items
+		  from <append> (which added duplicate property elements) to <set> (which
+		  replaces the value on the property already added by StandardSettings.xml).
+		  Duplicate properties caused the game to always read the first occurrence,
+		  making per-item overrides in other modlets have no effect.
+
+Version: 2.6.56.807
+	[ Item Degradation - Workstation Tool Degradation Offline Fix ]
+		- Tools in a workstation now degrade correctly when crafting happens while the player
+		  has left the workstation (bUserAccessing = false).
+		- Root cause: the ItemDegradation TileEntityWorkstationHandleRecipeQueue Prefix only
+		  checked whether the required tool was already broken (to stop the workstation) but
+		  never fired degradation events. The Recipe Feature Prefix called CheckToolsForDegradation
+		  but only when that feature was enabled, and even then craftingToolType = 0 recipes
+		  silently skipped every tool slot.
+		- Fix: the ItemDegradation Prefix now counts how many recipe completions fall within
+		  the current tick's _timePassed window using CraftingTimeLeft / OneItemCraftTime math,
+		  and calls CheckToolsForDegradation once per completion. This works regardless of****
+		  whether the Remote Crafting feature is enabled.
+		- Removed the duplicate CheckToolsForDegradation call from the Recipe Feature Prefix
+		  to prevent double-degradation when both patches are active.
+		- Note: degradation only fires when the recipe requires a specific tool type
+		  (craftingToolType != 0). Recipes with no required tool type do not degrade any tools,
+		  which is the intended behaviour.
+
+Version: 2.6.47.357
+	[ Item Degradation - ItemPercentUsed Requirement Display Fix ]
+		- passive_effects inside an effect_group gated by ItemPercentUsed, SCore now show their
+		  correct values on an item mod's stats page before installation.
+		- Root cause: IsValid called base.IsValid first; in a tooltip/stats display context
+		  _params.Self is null, causing TargetedCompareRequirementBase to return false and
+		  suppressing the entire effect_group even for a brand-new undamaged mod.
+		- Fix: base.IsValid is now skipped when _params.Self is null. The ItemValue condition
+		  (UseTimes / MaxUseTimes compared against the configured value) is evaluated directly,
+		  so a new mod with UseTimes=0 correctly satisfies operation="LT" value="1".
+
+	[ Item Degradation - DegradationBreaksAfter Now Removes Mods ]
+		- Item mods with DegradationBreaksAfter=true are now correctly removed from their
+		  parent item's Modifications slot when they reach 0 durability.
+		- Root cause A: CheckModification in ItemModificationDegradation.cs did
+		  mod = ItemValue.None which only reassigned the local parameter; the actual
+		  Modifications[] array slot was never updated.
+		- Root cause B: MinEventActionRoutineUpdate.CheckItemValue iterated Modifications
+		  with foreach, providing no array index to write back to.
+		- Fix: CheckItemValue now uses a for loop over Modifications. After ticking each mod,
+		  if IsDegraded and MaxUseTimesBreaksAfter are both true, the break sound plays and
+		  itemValue.Modifications[i] is set to ItemValue.None.Clone(), matching the existing
+		  equipment-slot removal pattern already used for degraded armor/clothing.
+		- Removed the dead mod = ItemValue.None assignment from CheckModification and replaced
+		  it with a comment noting that slot removal is handled by the caller.
+
+Version: 2.6.44.742
+	[ Repair - Flat Quality Levels Loss - Cvar Support ]
+		- RepairQualityLossLevels can now be set via player cvar (e.g. from a buff or progression),
+		  matching the existing cvar support for RepairQualityLoss. Stored as a whole integer;
+		  0 is treated as unset and falls through to per-item or global XML config.
+		- Priority order (highest wins): player cvar → per-item XML → global XML.
+			CVar name is: RepairQualityLossLevels
+
+Version: 2.6.43.925
+	[ NPC - Prevent Storing NPC Inside Another NPC's Inventory ]
+		- DialogActionPickUpNPC now blocks pickup of any NPC whose hand inventory, HarvestManager bag,
+		  or loot container contains an item with EntityClassId metadata (i.e. another stored NPC).
+		  Previously, picking up the outer NPC would serialize the inner NPC item via
+		  SerializeItemStackArray, which does not preserve ItemValue metadata. On deploy the inner
+		  NPC item would have no EntityClassId and could never be placed, producing the log warning
+		  "ItemActionDeployNPCSDX: No EntityClass defined for this item."
+		- XUiC_ItemStack_SlotTags.IsStackAllowedInContainer now runs the NoStorage metadata check
+		  before the xui.lootContainer null guard. Previously, drag-and-drop into entity-based
+		  containers (which have no world block position and may leave lootContainer null) bypassed
+		  the NoStorage gate entirely.
+		- EntitySyncUtils.GetNPCItemValue now stamps NoStorage = 1 on every NPC pickup item,
+		  activating the existing XUiC_ItemStack_SlotTags gate to prevent NPC items from being
+		  dragged into any container through the UI.
+		- Added localization keys npcHasItems and npcContainsNPC to 0-SCore/Config/Localization.txt.
+
+	[ Repair - Simultaneous Repair Queue Bug Fix ]
+		- Fixed a bug where repairing two items at the same time caused the second item to not
+		  lose any quality. Root cause: the patch used a single static _pendingOriginalQuality
+		  field and enforced only one RepairItem event subscription via -= then +=. When two
+		  repairs were queued back-to-back, the second Prefix call overwrote the static field
+		  and reused the single subscription. The first repair fired and unsubscribed the handler,
+		  leaving the second repair with no handler and no quality loss applied.
+		- Fixed by replacing the static int with a Queue<int>. Each Prefix call enqueues the
+		  pre-repair quality and adds one subscription (+=, no preceding -=). Each OnRepairItem
+		  call removes one subscription, reads quality from item metadata (preferred, item-specific)
+		  or dequeues from the queue (fallback, FIFO order matches repair queue order).
+
+	[ Repair - Flat Quality Levels Loss ]
+		- Added RepairQualityLossLevels support. When set, each repair loses exactly N quality
+		  levels regardless of the item's current quality. Takes priority over the existing
+		  percentage-based RepairQualityLoss path.
+		- Resolved from three sources in priority order (highest wins):
+		    1. Player cvar  RepairQualityLossLevels  — whole integer (2 = lose 2 levels).
+		       0 is treated as unset (falls through to item/global config).
+		    2. Per-item XML property  RepairQualityLossLevels  in items.xml.
+		    3. Global default  RepairQualityLossLevels  in AdvancedItemFeatures (blocks.xml).
+
+		Configuration examples:
+		    <property name="RepairQualityLossLevels" value="2"/>   <!-- lose exactly 2 levels per repair -->
+		    <set_cvar name="RepairQualityLossLevels" value="1"/>   <!-- 1 level loss while buff is active -->
+
+	[ ChallengeObjectiveHarvest - Clone Fix ]
+		- Clone() now copies isDebug and blockName fields. Previously both were dropped on clone,
+		  causing debug mode to silently turn off and block name filters to stop working after the
+		  challenge objective was cloned internally by the challenge system.
+
+Version: 2.6.40.647
+	[ EntityAliveSDX - Backpack Drop on Death ]
+		- Fixed backpack not dropping when an NPC dies. EntityAliveSDX extends EntityTrader, so the
+		  player-accessible bag is stored in HarvestManager rather than lootContainer. SetDead() now
+		  checks HarvestManager first and falls back to lootContainer for non-trader entities.
+		- Added null guard when creating the backpack entity to prevent a silent NullReferenceException
+		  if neither "BackpackNPC" nor "Backpack" entity class is found.
+		- HarvestManager.Remove() is now called on NPC death to clean up the harvest container,
+		  consistent with the pickup (collect) flow.
+
+Version: 2.6.35.1852
+	[ Repair - Quality Loss ]
+		- Added ItemActionEntryRepairQualityLoss patch: replaces vanilla's flat −1 quality-per-repair
+		  with a configurable percentage-based reduction. When no configuration is present the vanilla
+		  behaviour is preserved unchanged.
+		- Quality loss is resolved from three sources in priority order (highest wins):
+		    1. Player cvar  RepairQualityLoss  — stored as a decimal fraction (0.05 = 5%, 0.10 = 10%).
+		       A value of 0 is treated as unset (falls through to item/global config).
+		       A negative value (e.g. −1) means no quality loss; useful for a "master craftsman" perk.
+		    2. Per-item XML property  RepairQualityLoss  in items.xml — whole-number percentage (e.g. "5").
+		    3. Global default  RepairQualityLoss  in AdvancedItemFeatures (blocks.xml) — same format.
+		- Loss is calculated as  Ceil(qualityBeforeRepair × lossPercent / 100)  and the result is
+		  clamped to QualityUtils.GetMinQuality() so items can never be repaired below the configured
+		  minimum quality.
+
+		Configuration examples:
+
+		Global default (blocks.xml AdvancedItemFeatures — applies to all items):
+		    <property name="RepairQualityLoss" value="10"/>   <!-- 10% loss per repair -->
+
+		Per-item override (items.xml — takes priority over the global default):
+		    <property name="RepairQualityLoss" value="5"/>    <!-- this item loses only 5% per repair -->
+		    <property name="RepairQualityLoss" value="0"/>    <!-- this item never loses quality -->
+
+		Perk / buff cvar (highest priority — set dynamically via buffs.xml):
+		    <set_cvar name="RepairQualityLoss" value="0.05"/> <!-- 5% loss while buff is active -->
+		    <set_cvar name="RepairQualityLoss" value="-1"/>   <!-- no quality loss (master craftsman) -->
+
+	[ Harvest Challenge - traderPlaceable Blocks ]
+		- Fixed harvest challenge objectives (type="Harvest, SCore") not counting block harvests when
+		  the harvested block also carried the  traderPlaceable  tag
+		  (e.g. <property name="Tags" value="AdvancedCrops,traderPlaceable"/>).
+		- Root cause: vanilla's DamageBlock removes the block (position becomes air) before calling
+		  NotifyDestroyedBlock. That subsequent call re-checks IsWithinTraderArea for the now-air
+		  position; the prior patch only bypassed the check for positions that currently held a
+		  traderPlaceable block, so the air position fell through to vanilla, which returned true
+		  (inside trader area) and suppressed the HarvestItem event.
+		- Fix: WorldIsWithinTraderArea now records the last position where the traderPlaceable bypass
+		  fired (_lastBypassedPos). If the very next call for the same position finds air (the block
+		  was just destroyed), the patch continues to return false so the harvest and destroy events
+		  are not suppressed.
+
+Version: 2.6.32.1643
+	[ Powered Workstations - Offline Catch-Up ]
+		- Fixed powered workstations (RequirePower = true) stalling when the chunk was unloaded and
+		  then reloaded. Previously the prefix always set currentBurnTimeLeft to a fixed 15f when
+		  power was detected, which was insufficient for the vanilla workstation's offline catch-up
+		  loop: on chunk reload the loop attempts to apply all ticks elapsed since the last save in
+		  a single UpdateTick call, consuming burn time at 1:1. With only 15 units available, the
+		  workstation would run dry mid-catch-up and stop crafting.
+		- Added a static _lastPowerTick dictionary (Vector3i → ulong) on the PoweredWorkstations
+		  class that records the game tick at which power was last successfully applied to each
+		  workstation position.
+		- On each UpdateTick where power is detected, elapsed = now - lastPowerTick. The patch sets
+		  currentBurnTimeLeft to max(current, elapsed + 15f), supplying exactly enough burn time for
+		  the catch-up loop to complete plus a 15-tick buffer for the next normal tick. During normal
+		  loaded operation elapsed ≈ 1, so behaviour is identical to before.
+		- When power is lost the position is removed from the dictionary so there is no stale elapsed
+		  time if power is restored later.
+		- Note: the dictionary is in-memory only. On the first UpdateTick after a game restart,
+		  elapsed = 0 and the workstation receives the standard 15f buffer (same as the original
+		  behaviour), which is acceptable since vanilla workstations handle their own persistency.
+		- Also fixed a pre-existing typo in the Prefix method signature (___Let's pfuel → ___fuel).
+
+	[ NPC Farming - Water Range Fix ]
+		- FarmPlotData.HasWater() now includes the same 4-block horizontal fallback scan used by
+		  vanilla crops, plus a one-block-down check for each position. Previously only immediate
+		  neighbors (±1) were checked, causing outer farm plots that were valid for vanilla crop
+		  growth to be ignored by the farmer AI until the player manually interacted with them.
+		  After breaking a plant on an outer plot, the farmer would also stop tending it for the
+		  same reason — both issues are resolved by the wider scan.
+
+	[ NPC Farming - Double Water Consumption Fix ]
+		- BlockPlantGrowingSDX.UpdateTick and CheckPlantAlive now guard water checks and
+		  consumption behind a new IsRootBlock() helper. IsRootBlock() returns true only when the
+		  block directly below is NOT also a BlockPlantGrowingSDX, identifying the lowest block of
+		  a multi-block-tall plant stack. Two-block plants (e.g. coffee) were previously consuming
+		  water twice per growth tick because each block registered independently in CropManager
+		  and both ran the full water logic.
+
+	[ NPC Farming - FarmHere / RecallFarmer Commands ]
+		- Added FarmHere ExecuteCommandSDX action: removes the NPC from the player's active party
+		  (zeroes Leader and Owner cvars, removes hired_X stamp, evicts from SphereCache) but
+		  stores the player's entity ID in a new FarmOwnerEntityId cvar. The NPC is set to Stay
+		  order at its current position and no longer teleports to the player.
+		- Added RecallFarmer ExecuteCommandSDX action: restores the NPC to the player's active
+		  party via SetLeaderAndOwner. Only the player whose entity ID matches FarmOwnerEntityId
+		  can execute the recall; all others are silently blocked at both the dialog-requirement
+		  and code layers.
+		- FollowMe now includes an ownership guard: if an NPC is in farm mode (FarmOwnerEntityId
+		  > 0), only the registered owner can issue a FollowMe command.
+		- UAITaskFarmingV4.Start() now falls back to FarmOwnerEntityId when Leader/Owner are both
+		  zero, resolving the hiring player's PersistentPlayerData so land-claim restrictions
+		  continue to apply even after the NPC leaves the active party.
+		XML example:
+			<!-- Assign NPC to farm without following. Leader only, not already in farm mode. -->
+			<response id="farm_here" text="farm_here_key" nextstatementid="farm_mode_active">
+			    <requirement type="Leader, SCore" requirementtype="Hide" />
+			    <requirement type="IsFarmOwner, SCore" requirementtype="Hide" value="not" />
+			    <action type="ExecuteCommandSDX, SCore" id="FarmHere" />
+			</response>
+			<!-- Recall NPC. Visible only to the registered farm owner. -->
+			<response id="recall_farmer" text="recall_farmer_key" nextstatementid="recalled">
+			    <requirement type="IsFarmOwner, SCore" requirementtype="Hide" />
+			    <action type="ExecuteCommandSDX, SCore" id="RecallFarmer" />
+			</response>
+
+	[ Dialog - IsFarmOwner Requirement ]
+		- Added DialogRequirementIsFarmOwner: passes when the talking player's entity ID matches
+		  FarmOwnerEntityId on the current NPC (i.e., player is the registered farm owner). With
+		  value="not", passes when the NPC is NOT in farm mode. Used to gate FarmHere/Recall
+		  dialog options and prevent NPC theft by other players.
+		XML:
+			<requirement type="IsFarmOwner, SCore" requirementtype="Hide" />
+			<requirement type="IsFarmOwner, SCore" requirementtype="Hide" value="not" />
+
+	[ Dialog - HiredSDX Requirement Update ]
+		- DialogRequirementHiredSDX now also returns true when FarmOwnerEntityId > 0, treating
+		  farm mode as a hired state. This prevents the Hire button from re-appearing on NPCs
+		  that have been assigned to farm mode.
+
+	[ Farming Debug - scorefarming / scf Console Command ]
+		- Added ConsoleCmdFarming with commands: scf count, scf validate, scf listplots [range],
+		  scf listcrops [range]. All output is mirrored to both the console and the log file via
+		  Log.Out.
+		- scf validate: prunes stale FarmPlotManager and CropManager entries whose blocks no
+		  longer exist in the world, and reports how many were removed.
+		- scf listplots: reports each registered farm plot position, its HasWater status, and the
+		  name of any crop block found in the 4 blocks above it.
+		- scf listcrops: reports each registered crop plant position, its block name, and the name
+		  of the farm plot block found in the 4 blocks below it (if any).
+
+Version: 2.6.29.1709
+	[ Quality - Custom Quality Levels ]
+		- Added XUiMItemStackGetCustomDisplayValueForItem patch: fixes item tooltip display_value tier
+		  lookups when using extended quality ranges (1-600). Vanilla passes raw quality as an array
+		  index, causing out-of-bounds reads on 6-element value arrays. The patch converts raw quality
+		  to a tier (1-6) via QualityUtils.CalculateTier() before calling GetValue(), mirroring what
+		  MinEventModifyCVar already does for triggered effects.
+		- Fixed crash/lockup: added null guards for null/empty ItemValue, null ItemClass, non-quality
+		  items (tier == 0), and null GetTriggeredEffects() return values in the new patch.
+	[ Quality - Workstation Crafting ]
+		- Refactored XUiCWorkstationWindowGroupSyncTEFromUI: replaced per-call packing of all items
+		  with a persistent QualityCache (keyed by tile entity position + queue slot) that only stores
+		  items with quality > 255. Phase 2 re-asserts cached packed values on every syncTEfromUI call,
+		  including window teardown, so the quality is preserved even after the player closes the
+		  workstation.
+		- TileEntityWorkstationAddCraftComplete now captures the __instance parameter so it can evict
+		  the completed craft's entry from QualityCache when the item is finished.
+	[ NPC Farming - Land Claim Restriction ]
+		- UAITaskFarmingV4 now resolves the hiring player's PersistentPlayerData once in Start() and
+		  passes it to a new IsAllowed() check in FindTargetFarmPlot(). Hired NPCs (those with a player
+		  leader) are restricted to farm plots inside their leader's active land claim; un-hired NPCs
+		  can farm any plot as before.
+		- Added UAIConsiderationFarmPlotInLandClaimV4 and UAIConsiderationNotFarmPlotInLandClaimV4:
+		  UAI considerations that score 1f / 0f based on whether any unvisited farm plot within a
+		  configurable distance lies inside an active land claim.
+		  XML: <consideration class="FarmPlotInLandClaim, SCore" distance="50" />
+		- Added FarmLandClaimUtils.IsPlotInLandClaim(): shared helper that checks PersistentPlayerList
+		  .m_lpBlockMap using the same axis-aligned distance logic as World.IsLandProtectedBlock.
+		  Accepts an optional ownerFilter to restrict the check to a specific player's claims.
+		- Fixed potential NRE: all land-claim checks now guard against null PersistentPlayerList,
+		  null m_lpBlockMap, and null FarmPlotManager.Instance.
+
+Version: 2.6.21.1949
+	[ NPC Weapon Swapping / Dialog ]
+		- Fixed weapon swap dialog options (e.g. "Use Knife") never appearing for EntityTrader-based
+		  NPCs (EntityAliveSDX, EntityAliveSDXV4) even when the NPC had the required item.
+		- Root cause: DialogRequirementNPCHasItemSDX checked lootContainer for the player weapon,
+		  but EntityTrader NPCs store their accessible inventory in HarvestManager. The dialog
+		  option was always hidden because HasItem found nothing.
+		- DialogRequirementNPCHasItemSDX now checks HarvestManager first for EntityTrader entities,
+		  falling back to lootContainer for non-trader entities.
+		- Fixed FindWeapon() in both EntityAliveSDX and EntityAliveSDXV4 performing the same wrong
+		  lookup on the CompatibleWeapon path — now checks HarvestManager for EntityTrader entities.
+		- Fixed "Use Bare Hands" (meleeNPCEmptyHand) and other starting-kit weapons never equipping:
+		  FindWeapon() gated all lookups behind a CompatibleWeapon property check, so items that
+		  lack that property (like meleeNPCEmptyHand) always returned false. itemsOnEnterGame and
+		  the current hand-item are now checked before the CompatibleWeapon gate.
+		- Fixed UAITaskFarmingV4.CheckHasSeed() checking lootContainer instead of HarvestManager,
+		  causing farmer NPCs to never detect seeds they were carrying and skip all empty farm plots.
+
+Version: 2.6.21.1125
+	[ NPC Pickup / PickUpNPC ]
+		- Fixed NPC inventory being lost when picked up via DialogActionPickUpNPC and placed back
+		  down with ItemActionDeployNPCSDX.
+		- Fixed NPC inventory not persisting across game restarts for both EntityAliveSDX and
+		  EntityAliveSDXV4.
+		- Root cause: both entity classes extend EntityTrader, so the OpenInventory dialog command
+		  always routes the player-accessible bag through HarvestManager — but GetNPCItemValue was
+		  serializing npc.lootContainer.items (a different, empty object) instead.
+		- GetNPCItemValue now reads from the HarvestManager container when one exists for the entity,
+		  falling back to lootContainer for non-trader entities.
+		- SetNPCItemValue now restores bag items into HarvestManager.GetOrCreate(entityId) for
+		  EntityTrader-based entities, so the new entity's inventory is populated before the player
+		  opens it.
+		- EntityAliveSDX and EntityAliveSDXV4 Write() now saves the HarvestManager container (when
+		  present) into the entity's own binary stream instead of lootContainer, and Read() restores
+		  it back into HarvestManager — tying inventory to the entity save data rather than a
+		  separate file keyed by entity ID.
+		- HarvestManager.Save() is now called on GameShutdown as an additional safety net.
+		- Fixed SetupStartingItems() not checking the InitialInventory guard, causing the NPC's
+		  hand-inventory slots to be overwritten with default XML items on every spawn/re-place.
+
+Version: 2.6.14.638  [ Experimental ]
+	[ Remote Crafting ]
+		- Fixed a bug where `disablesender` with `Invertdisable` set to `true` would stop scanning containers
+		  entirely as soon as a non-allowed container was encountered (`break` instead of `continue`).
+		- To restrict remote crafting to only a specific container, set `disablesender` to the container's
+		  loot list name and set `Invertdisable` to `true`:
+
+			<!-- Only allow remote crafting from containers using the loot list "mySpecialStorage" -->
+			<property class="AdvancedRecipes">
+				<property name="ReadFromContainers" value="true"/>
+				<property name="disablesender" value="mySpecialStorage"/>
+				<property name="Invertdisable" value="true"/>
+			</property>
+
+		  Multiple containers can be allowed by providing a comma-separated list:
+			<property name="disablesender" value="mySpecialStorage,myOtherStorage"/>
+
+Version: 2.6.12.720  [ Experimental ]
+	[ UAI Farming - Dedicated Server ]
+		- Fixed harvest inventory (HarvestManager) not persisting across server restarts. Data is now
+		  saved to HarvestManager.bin in the save directory after each harvest cycle and when the player
+		  closes the loot window, and reloaded on GameStartDone.
+		- Fixed maintenance particles never being removed on dedicated servers. SpawnParticleEffectServer
+		  does not register particles in m_BlockParticles, so RemoveBlockParticleEffect was a no-op.
+		  addParticlesCenteredServer now broadcasts NetPackageAddBlockParticleEffect so each client calls
+		  SpawnBlockParticleEffect (which does register), and removeParticlesCenteredServer broadcasts
+		  NetPackageRemoveBlockParticleEffect so clients can clean them up correctly.
+	[ NPC Teleport - Farm Plot Height ]
+		- Fixed hired NPCs spawning one block inside farm plots (or other player-placed blocks) after
+		  player relog. TeleportToPlayer used World.GetHeightAt which returns terrain height only.
+		  Replaced with GetSurfaceY() in both EntityAliveSDX and EntityAliveSDXV4, which scans upward
+		  from terrain through any solid placed blocks to find the true walkable surface. Applied to
+		  both the initial teleport position and the validateTeleport safety coroutine.
+
+	[ SphreII NPC Add On ]
+		- Added new modlet to support the EntityAliveSDXV4's utilityai.xml
+
+Version: 2.6.11.839  [ Experimental ]
+	[ UAI Farming - Dedicated Server ]
+		- Fixed farming UAI tasks not executing on dedicated servers (addParticlesCentered DS guard).
+		- Fixed EndOfStreamException in TraderData when trader-type NPCs (EntityAliveSDXV4) harvest
+		  crops. Introduced HarvestManager — a per-entity TileEntityLootContainer stored separately
+		  from the trader's lootContainer, bypassing TraderData serialisation entirely.
+		- Fixed NullReferenceException when opening a trader NPC's harvest inventory (chunk + entityId
+		  setup on the HarvestManager container).
+		- Fixed harvest items not appearing for dedicated server clients. Added
+		  NetPackageHarvestInventoryRequest (client→server) and NetPackageHarvestInventoryData
+		  (server→client) so the server serialises and delivers the harvest container contents to
+		  the requesting client, who opens them in a local loot window.
+
+	[ EntitySwimingSDX ]
+		- Replaced List<Vector3i> with a HashSet + List pair for O(1) Contains and O(1) random
+		  access respectively, eliminating per-tick O(n) scans.
+		- Added periodic water-block refresh (every ~15 s) so fish track their current position
+		  instead of chasing stale spawn-time waypoints.
+
+	[ SphereII A Better Life ]
+		- Fixed terrWaterSpawner not spawning fish (entity group name mismatch: AnimalSwimming →
+		  SABLAnimalSwimming).
+		- Stripped unused language columns from Localization.txt, leaving Key and english only.
+		- Documented arramus's V2 compliance contributions: localization, fish prefix/template
+		  naming, UserSpawnType menu control, and underwater biome plant decorations.
+
+	[ SphereII Legacy Distant Terrain ]
+		- Removed global stack trace silencing from InitMod that affected all mods session-wide.
+		- Fixed misleading patch class name (SphereII_VoxelMeshTerrain_Update →
+		  SphereII_WorldEnvironment_Update).
+		- Removed unreachable null check in createDistantTerrain Postfix.
+		- Clarified null terrain generator fallback in terrainHeightFuncAllOtherWorlds.
+
+Version: 2.6.10.1108  [ Experimental ]
+	[ NPCv4 / IEntityAliveSDX - V4 Entity Support ]
+		NPCv4 (EntityAliveSDXV4) is a ground-up rewrite of the NPC entity that extends EntityTrader
+		instead of EntityAlive, using a component-based architecture (NPCLeaderComponent,
+		NPCPatrolComponent, NPCCombatComponent, NPCEffectsComponent) to replace the monolithic
+		EntityAliveSDX class. The goal is cleaner separation of concerns, better compatibility with
+		vanilla trader systems, and a more maintainable foundation for future NPC features.
+		The IEntityAliveSDX interface bridges V3 and V4, allowing shared code (UAI tasks, dialog
+		scripts, utility methods) to work with either entity type without hard casts.
+
+		- Updated EntityUtilities.ExecuteCMD to support EntityAliveSDXV4 via IEntityAliveSDX and
+		  IEntityOrderReceiverSDX interfaces. V3-exclusive fields (bodyDamage) remain gated behind
+		  a conditional EntityAliveSDX cast; all other operations now work for both V3 and V4.
+		- Updated EntityUtilities.TeleportNow to use IEntityAliveSDX type guard instead of a hard
+		  EntityAliveSDX cast, allowing V4 entities to be teleported.
+		- Updated EntityUtilities.AddQuestToRadius to detect both EntityAliveSDX (V3) and
+		  EntityAliveSDXV4 (V4) when adding quests to nearby NPCs.
+		- Updated DialogActionAnimatorSet to cast via IEntityAliveSDX instead of EntityAliveSDX,
+		  allowing V4 entities to receive animator commands from dialogs.
+		- Updated DialogActionDisplayInfo to cast via IEntityAliveSDX, allowing V4 entities to
+		  display info dialogs.
+		- Updated DialogActionRemoveBuffNPCSDX to cast via IEntityAliveSDX, allowing V4 entities
+		  to have buffs removed through dialogs.
+		- Updated DialogActionSwapWeapon to cast via IEntityAliveSDX, using the interface's
+		  UpdateWeapon() method so V4 entities can swap weapons through dialogs.
+		- Updated DialogRequirementHasQuestSDX to cast via IEntityAliveSDX; NPCInfo accessed via
+		  EntityTrader cast, supporting V4 quest requirements.
+		- Updated DialogRequirementNPCHasItemSDX to cast via IEntityAliveSDX with null-safe loot
+		  container checks, supporting V4 inventory requirements.
+		- Updated DialogActionPickUpNPC to cast via EntityAlive + IEntityAliveSDX, enabling V4
+		  entity pickup. EntitySyncUtils.GetNPCItemValue, SetNPCItemValue, Collect, and
+		  CollectClient now accept EntityAlive and use IEntityAliveSDX for name, title, and
+		  weapon access; V3-specific fields (belongsPlayerId, _currentWeapon) use conditional
+		  casts. IEntityAliveSDX gains FirstName and Title members. EntityAliveSDXV4.Title.set
+		  was fixed (previously threw NotImplementedException). All deploy/place net packages
+		  and ItemActionDeployNPCSDX updated to cast via EntityAlive rather than EntityAliveSDX.
+
+	[ UAI Troubleshooting / Diagnostics ]
+		- Added per-entity AIPackage diagnostics to EntityAliveSDXV4.PostInit via new
+		  LogMissingAIPackages() method. On spawn, logs which packages were found vs. missing
+		  from UAIBase.AIPackages, making load-order conflicts immediately visible in the log.
+		- Added empty-AIPackages-list warning in UAIBase.chooseAction Prefix: if an entity has
+		  no AI packages, a single warning is logged explaining what to check.
+		- Added per-package missing-package warning in UAIBase.chooseAction Prefix using a
+		  HashSet deduplication guard, preventing log spam while still surfacing undefined
+		  package names on first encounter.
+
+	[ UAI Performance / Bug Fixes ]
+		- Replaced triple dictionary lookup (ContainsKey + two indexed accesses) in
+		  UAIBase.chooseAction with a single TryGetValue call, reducing redundant hash lookups
+		  per AI evaluation cycle.
+		- Removed dead-code sort in AddWaypointTargetsToConsider: the sort was applied to the
+		  WaypointTargets list immediately after Clear(), so it operated on an empty list every
+		  time and had no effect.
+		- Fixed incorrect log-line order in AddWaypointTargetsToConsider: the count was logged
+		  before waypoints were gathered, reporting 0 every time.
+
+	[ UAI Farming ]
+		- Fixed two farmer NPCs targeting the same crop simultaneously. Added a shared static
+		  HashSet<Vector3i> claim registry to UAITaskFarming and UAITaskFarmingV4. A plot is
+		  claimed in Start() immediately after selection and released in Stop(), covering both
+		  normal task completion and interruption. FindTargetFarmPlot() skips any plot already
+		  in the registry, so each farmer always works a unique plot.
+		- Fixed harvested items not being added to the NPC's inventory. Three silent failure
+		  modes were patched in HandleHarvestingAndCleanup for both UAITaskFarming and
+		  UAITaskFarmingV4:
+		    * FastMax(0, minCount) could produce a 0-count ItemStack that AddItem silently rejects;
+		      clamped to FastMax(1, minCount).
+		    * item.prob was never checked; items now roll against their drop probability.
+		    * ItemClass.GetItem result was not validated; unknown item names now log a warning
+		      and are skipped instead of producing an invalid ItemValue.None stack.
+		- Fixed NPC farmer not harvesting fully-grown crops whose block type does not extend
+		  BlockPlant (e.g. BlockPickUpAndReplace-based final stages such as plantedCoffee3HarvestPlayer).
+		  FarmPlotData.Manage() previously checked IsDeadPlant() before checking harvest drops,
+		  so any non-BlockPlant block was cleared as a "dead plant" with no items returned.
+		  The branch order is now: HasItemsToDropForEvent(Harvest) first (harvest), then
+		  IsDeadPlant() (clear), then growing-plant skip, then empty-plot replant.
+		- Fixed NPC farmer not replanting immediately after harvesting. Two causes:
+		    * CanPlaceBlockAt was checked against the live world while the harvested block was
+		      still present, always returning false. The check is removed; placement validity is
+		      guaranteed by the block name resolving correctly.
+		    * SetBlocksRPC was called with two entries at the same position (air then seed).
+		      The intermediate air state triggered a physics/support check that caused the seed
+		      to fall through the world before it could stabilise. Replaced with a single-entry
+		      RPC that writes the seed directly over the harvested block.
+		- Fixed malformed drop table entries (empty item name, zero maxCount) from block
+		  itemsToDrop reaching the NPC inventory loop and producing unknown-item warnings.
+		  FarmPlotData.Manage() now strips these entries during harvest-item processing.
+		- Fixed FarmPlotData.Manage() mutating the block singleton's shared itemsToDrop lists.
+		  TryGetValue returns a direct reference to the block class's internal List; RemoveAt
+		  and AddRange on that reference permanently altered shared drop data for all future
+		  harvests. Drops are now copied into a pre-allocated local list via AddRange.
+		- Added Log.Out diagnostics throughout FarmPlotData.Manage() (block name, hasHarvestDrops,
+		  raw drop list, seed extraction result, replant path taken) to aid future field diagnosis.
+		- Fixed NPC farmer not watering corner (diagonally adjacent) farm plots.
+		  WaterPipeManager.GetWaterForPosition() only checked the 6 orthogonal neighbors for
+		  direct water adjacency, so plots diagonally adjacent to a water source returned no
+		  water and were skipped by the NPC despite being plantable by players. Added the 4
+		  horizontal diagonal neighbors to the scan so corner plots are correctly detected.
+		- Fixed UAI farming tasks not executing on dedicated servers. BlockUtilitiesSDX.addParticlesCentered
+		  had its dedicated-server early-return guard placed after ParticleEffect.IsAvailable() and
+		  ParticleEffect.LoadAsset() calls. On a dedicated server LoadAsset fails before the guard
+		  is reached, which prevented the subsequent AddBuff(_workBuff) call; without the buff,
+		  _hasWorkBuffApplied was never set and the state machine never reached HandleHarvestingAndCleanup.
+		  Fixed by moving the if (GameManager.IsDedicatedServer) return guard to the top of the method,
+		  matching the pattern already used in addParticles.
+		- Fixed EndOfStreamException in TraderData.ReadInventoryData when a trader-type NPC (EntityAliveSDXV4,
+		  which extends EntityTrader) harvested a crop. TileEntityLootContainer.AddItem() always calls
+		  SetModified() internally; on TileEntityTrader this triggers a network packet that serialises
+		  both items[] and TraderData in one stream. Any mismatch between the two stores causes an
+		  EndOfStreamException on the receiving client.
+		  Fix: Added HarvestManager — a static per-entity dictionary of plain TileEntityLootContainers
+		  that are never attached to the world tile-entity system. Items written directly to items[]
+		  without SetModified(), completely bypassing TraderData serialisation. UAITaskFarming and
+		  UAITaskFarmingV4 route harvest items to HarvestManager when the entity is EntityTrader;
+		  non-trader entities continue to use lootContainer.AddItem() as before.
+		- Fixed NullReferenceException in XUiC_LootWindowGroup.OnOpen() when a player opened a
+		  trader-type NPC's harvest inventory. TileEntity.get_blockValue() dereferences this.chunk;
+		  creating the HarvestManager container with a null chunk caused the exception. Fixed by
+		  looking up the entity's current chunk via World.GetChunkSync and passing it to the
+		  TileEntityLootContainer constructor, and setting container.entityId so OnOpen takes the
+		  entity loot-stage path (which does not cast blockValue.Block to BlockLoot).
+		- Fixed harvested items not appearing when a player opened a trader-type NPC's inventory
+		  on a dedicated server. The dialog action (DialogActionExecuteCommandSDX.PerformAction)
+		  runs client-side, while HarvestManager lives on the server process; the client's
+		  HarvestManager was always empty. Fixed with two new NetPackages:
+		    * NetPackageHarvestInventoryRequest (client → server): requests the NPC's harvest
+		      contents; server serialises the items, clears the server-side container, and sends
+		      the response.
+		    * NetPackageHarvestInventoryData (server → client): client deserialises the items,
+		      builds a local-only TileEntityLootContainer, and opens the loot window.
+		  On a listen server HarvestManager is local, so the loot window continues to be opened
+		  directly without a network round-trip. EntityUtilities.ExecuteCMD now branches on
+		  ConnectionManager.IsServer to choose the correct path.
+
+	[ EntitySwimingSDX ]
+		- Fixed per-tick O(n) Contains call in IsGoingToWater(). WaterBlocks was a List<Vector3i>;
+		  replaced with two parallel stores: a HashSet<Vector3i> (_waterBlockSet) for O(1) Contains
+		  used on every update tick, and a List<Vector3i> (_waterBlockList) for O(1) indexed random
+		  access used by GetRandomPosition().
+		- Fixed O(n) duplicate guard in RefreshWaterBlocks(). The old code called List.Contains before
+		  every Add during the scan loop. With HashSet, Add returns false for duplicates automatically,
+		  so no explicit guard is needed.
+		- Fixed fish waypoints becoming stale after the entity swam out of its initial spawn-time scan
+		  volume. RefreshWaterBlocks() was only called once in OnAddedToWorld(); fish that moved beyond
+		  the original 20x10x20 scan range would keep targeting old positions and eventually despawn.
+		  Added a _refreshCounter that triggers a full clear-and-rescan centred on the entity's current
+		  position every 300 ticks (~15 s at 20 ticks/s).
+
+	[ SphereII A Better Life ]
+		- Fixed terrWaterSpawner block not spawning any fish. The SpawnCubeRepeater Config had
+		  eg=AnimalSwimming but the entity group defined in entitygroups.xml is SABLAnimalSwimming.
+		  Corrected to eg=SABLAnimalSwimming so the world-decoration spawner blocks resolve the group.
+		- Cleaned up Config/Localization.txt: removed unused language columns (german, spanish, french,
+		  italian, japanese, koreana, polish, brazilian, russian, turkish, schinese, tchinese) and
+		  the File, Type, UsedInMainMenu, NoTranslate, and Context columns, leaving only Key and english.
+		[ Contributor: arramus ]
+		- Added localization entries for all fish entities and underwater plant blocks.
+		- Introduced fish prefix and template naming convention: fishPassiveTemplate and
+		  fishAggressiveTemplate serve as base templates; all concrete fish entities use the fish
+		  prefix (fishStingRay, fishTurtle, fishSardine, etc.) for consistent identification.
+		- Set UserSpawnType=None on both templates to suppress them from the spawn menu, and
+		  UserSpawnType=Menu on all concrete fish entities so only viable types are player-spawnable.
+		- Added all underwater plant blocks as biome decorations in the underwater biome, allowing
+		  them to appear in-world for environmental showcasing.
+
+	[ SphereII Legacy Distant Terrain ]
+		- Removed two Application.SetStackTraceLogType calls from InitMod that globally silenced
+		  Log and Warning stack traces for the entire session. This suppressed useful diagnostic
+		  output from all other mods and vanilla code, not just this mod's own logging.
+		- Renamed patch class SphereII_VoxelMeshTerrain_Update to SphereII_WorldEnvironment_Update
+		  to correctly reflect the type it patches (WorldEnvironment.Update, not VoxelMeshTerrain).
+		- Removed redundant null check in createDistantTerrain Postfix. DistantTerrain.Instance was
+		  assigned unconditionally inside an if (Instance == null) block and then immediately checked
+		  again before SetTerrainVisible. The second guard was unreachable on a successful assignment;
+		  SetTerrainVisible is now called directly after Configure.
+		- Clarified the null terrain generator fallback in terrainHeightFuncAllOtherWorlds. The
+		  implicit return of poiheightOverride (always 0 at that point) when GetTerrainGenerator()
+		  returns null has been made explicit with a local variable and a comment explaining that
+		  sea level (0) is intentionally returned so distant tiles render flat rather than using
+		  uninitialised height data.
+
+	[ Fire Manager ]
+		- Fixed fire particle left-behind after a burning block is destroyed by a player or
+		  explosion. ChunkSetBlock Harmony Postfix previously skipped all non-POI-reset block
+		  changes due to an inverted guard (if (!_fromReset) return). The fix restructures the
+		  check: POI resets always clear fire unconditionally; for other block changes, the patch
+		  now checks IsBurning() and immediately calls ClearFire() if the new block is air. This
+		  prevents the particle from lingering until the next UpdateFires cycle (up to
+		  CheckInterval seconds). IsBurning() is an O(1) dictionary lookup, so the overhead on
+		  every block change is negligible.
+
+	[ Utility / Code Quality ]
+		- Removed duplicate ItemStack.Empty guard in EntityUtilities.CheckItemStack(ItemStack, Type):
+		  the same Equals(stack, ItemStack.Empty) check was being evaluated twice with only a null
+		  check in between.
+
+Version: 2.6.8.1428  [ Experimental ]
+	[ Fire Manager ]
+		- Fixed fire state (active fires and smoke) not properly restoring on load. The Read() method now
+		  correctly rebuilds fire data, restarts particle/light effects, and re-raises smoke events.
+		- Fixed smoke timers using real time (Time.time) instead of world time, causing smoke to
+		  expire immediately on relog.
+		- Fixed loaded fires not being synced to clients after a server load.
+		- Fixed FireDamage property not being read from blocks due to an empty string check bug.
+		- Added FirePersists config option (default: false). When true, active fires and extinguished
+		  positions are saved and restored across server restarts.
+			<property name="FirePersists" value="true" />
+
+	[ Fire Manager - Performance ]
+		- Cached flammable/inflammable FastTags as static fields in FireHandler; previously parsed
+		  on every IsFlammable() call during fire spread.
+		- Replaced O(n²) string concatenation in FireHandler.Write() with string.Join; large fires
+		  caused severe save slowdowns.
+		- Replaced the new Queue allocation in FireHandler.UpdateFires() with a clear-and-refill
+		  on the existing queue to avoid per-cycle heap allocation.
+		- Replaced LINQ allocations in SmokeHandler.CheckSmokePositions() and Clear() with manual
+		  loops using a reusable buffer field.
+		- Fixed dead loop in SmokeHandler.LoadState() that iterated the smoke timer dictionary
+		  immediately after clearing it.
+		- Replaced LINQ allocations in LightManager.RemoveInvalidLights() with a manual loop
+		  using a reusable buffer field.
+		- Replaced per-call new HashSet allocation in LightManager.UpdateFadingLights() with a
+		  reusable List buffer field.
+		- Replaced O(n log n) OrderBy(Random.value) + O(n²) FirstOrDefault reverse-lookup in
+		  LightManager.ManageLightLimit() with a single O(n) pass over the position dictionary.
+		- Cached FireSound.ToLower() as a field in FireManager; previously allocated a new string
+		  per player per call in CheckForPlayer().
+		- Promoted the Stopwatch in FireManager.UpdateSystemsRoutine() from a per-cycle local
+		  variable to a reusable instance field.
+		- Added null guard on NetPackageAddExtinguishPositions.GetLength() to match the other
+		  batch fire packet classes.
+
+	[ Portals ]
+		- Fixed infinite packet loop: NetPackagePortalAddPosition and NetPackagePortalRemovePosition
+		  now call AddEntry/RemoveEntry directly instead of AddPosition/RemovePosition, which was
+		  routing back to the server and creating a loop.
+		- Fixed missing base.write() calls in NetPackagePortalRemovePosition and NetPackagePortalMapSync,
+		  which caused malformed packets.
+		- Fixed PortalManager.Init() registering handlers only when IsServer was true. Since Init is
+		  called during block registration (before ConnectionManager is ready), handlers were never
+		  registered and portals did not load on startup.
+		- Fixed portals not being registered on load: BlockPortal2.Init() now touches PortalManager.Instance
+		  early to ensure the GameStartDone handler is registered before the event fires.
+		- Fixed OnBlockRemoved and OnBlockLoaded calling the portal manager for child blocks,
+		  causing duplicate or incorrect entries.
+		- Fixed OnBlockAdded setting the sign text after calling AddPosition, so the portal was
+		  registered with an empty name. Text is now set first.
+		- Fixed GetActivationText calling AddPosition on every hover/focus event (side-effect removed).
+		- Fixed teleport resolving the destination inside a Task.Delay continuation on a background
+		  thread. Destination is now resolved on the main thread before the delay begins.
+		- Fixed players falling through terrain on arrival: a ChunkObserver is added at the
+		  destination before the delay and removed after teleport, forcing the chunk to load.
+		- Fixed player spawn position for multi-block portals: player now arrives at the center
+		  of the portal footprint rather than the corner parent position.
+		- Fixed ToggleAnimator with a null-safe chunk fetch to prevent errors when the chunk
+		  is not yet loaded.
+		- Fixed TileEntityPoweredPortal not registering the portal when a player types its name:
+		  AddPosition is now called in SetText so player-configured portals are tracked correctly.
+		- Added AddEntry/RemoveEntry methods to PortalManager for direct local-map updates,
+		  and added DestinationMap for pre-resolved source->destination links so GetDestination
+		  works without the destination chunk being loaded.
+
+Version: 2.6.8.837  [ Experimental ]
+	[ Farming ]
+		- Fixed water depletion not working: BlockLiquidv2 blocks are now drained via DoExchangeAction; A21+ voxel water is drained via chunk.GetWater/SetWater with chunk-local coordinates.
+		- Fixed pipe blocks being incorrectly identified as direct water sources (IsDirectWaterSource now excludes BlockWaterPipeSDX before checking world.IsWater).
+		- Fixed CropManager.IsNearWater ignoring the caller's waterRange parameter (was creating a temporary PlantData on an air block, falling back to default range of 5).
+		- Fixed NPC farming: seed loss and race condition on replant (now uses a single atomic SetBlocksRPC with [air, seed] entries).
+		- Fixed NPC farming: seed is now returned to harvest items or NPC inventory if CanPlaceBlockAt fails.
+		- Fixed NPC harvested items being silently lost when NPC inventory is full; items are now dropped on the ground instead.
+
+	[ Sprinklers ]
+		- Fixed sprinklers auto-activating when placed without a connected water source (CheckWaterConnection now always verifies actual water).
+		- Fixed RequirePipesForSprinklers config not being enforced: CanPlaceBlockAt now requires an adjacent pipe block when the setting is enabled.
+		- Simplified pipe block invalidation logic to use RefreshAllSprinklers.
+	** NOTE **:
+		- Due to the way water changes in 2.x and the crop manager, it's recommended if you are consuming water from a water source, that
+			you want to increase the amount of water it takes to 50 or so, instead of 1 or 2.
+
+	[ XUi ]
+		- Moved the broadcast button position to prevent overlap.
+
+	[ Drop Box ]
+		- Fixed an issue where using a drop box without a text field would throw an exception.
+
+
+Version: 2.6.4.713  [ Experimental ]
+	[ Fire Manager ]
+		- Fixed an issue where fire wasn't restarted on relog when enabled.
+
+	[ Challenges ]
+		- Removed an unneccesary safety check that was causing problems with null reference
+
+	[ Farming ]
+		- Refactored the Manage method for planting crops, and added a catch if inventory is full
+
+	[ NPCs ]
+		- Fixed an issue where NPCs could be duplicated when the player dies.
+
+Version: 2.5.53.911
+	[ NPCs ]
+		- Fixed an issue where an NPC would get run over while you were driving, and you'd pay the price.
+
+	[ Drop Box ]
+		- Refactored distribution code slightly to add guards against lost item stacks during distribution.
+
+	[ Challenges ]
+		- Added a check in Sleeper Cleared to make sure that another player is within the same POI as the clearer.
+
+Version:  2.5.48.914
+
+	[ NPCs ]
+		- Added a patch by Gussak to fix NPCs getting stuck on corpses.
+			- https://github.com/SphereII/SphereII.Mods/issues/133
+
+	[ Remote Repair ]
+		- Added some fixes to prevent repairing from remote containers when enemies are around.
+
+	[ Quality ]
+		- Fixed an issue where item values of quality in the xml will scale to the quality settings over all.
+		- ie, if you have 1 to 600 quality levels, and your xml list only 6 possible values ( vanilla ), then the tier of the quality item will be used
+		- as an index value, rather than throwing out of bounds.
+		Example:
+			<! quality 56 would use 02.  Quality 500 would use .1, etc -->
+			<triggered_effect trigger="onSelfEquipUpdate" action="ModifyCVar" cvar="$treatedPreacher" operation="set" value=".02,.04,.06,.08,.1,.2">
+			
+	[ UAI ]
+		- Added a safety check for UAI Consideration Target Weapon Range
+
+	[ Quests ]
+		- Integrated some patches by khzmusik.
+		```
+		This implements the feature request from ticket 127, but also fixes other bugs that were introduced by vanilla game updates.
+
+		New feature for [Teleport Quests] Localization of Objective keyword in ObjectiveGotoPOISDX.cs and related Objective patches.  
+
+		#127: Subtypes of ObjectiveRandomPOIGoto use their own localization keys for keywords (and not just "ObjectiveRallyPointHeadTo") - 
+		by default their values match vanilla in Localization.txt
+		
+		Subtypes of ObjectiveRandomPOIGoto no longer need their own implementations of SetDistanceOffset (the base class method was made public in a recent game update)
+		QuestUtils.ValidPrefabForQuest once again checks for quest tags (if it didn't, ObjectiveRandomTaggedPOIGotoSDX would not be compatible with vanilla quests)
+		
+		I don't know why the code was originally commented out, but I took a guess that POIs weren't matching if the XML property was empty, so I additionally added a check for questTag.IsEmpty to make sure empty quest tags aren't considered
+		QuestUtils.GetRandomPOINearTrader code updated to have the same functionality as DynamicPrefabDecorator.GetRandomPOINearTrader (which was updated for 2.5)
+		
+		Adjusted min search distances to match current vanilla value ObjectiveRandomTaggedPOIGotoSDX.CopyValues copies the values which are copied in the base class Clone method (this method can't be called by subclasses)
+		Minor fixes to ObjectiveRandomTaggedPOIGotoSDX (documentation, renamed inaccurately-named variable)
+		```
+
+Version: 2.5.39.1103
+	[ Quality]
+		- Backed out a bad patch causing cvars and buffs not to apply correctly. 
+
+Version: 2.5.36.1511
+	[ Quality ]
+		- Fixed an issue where Quality levels above 255 were being reset to lower values when crafting in closed workstation.
+		- The game code was casting ItemQuality to a byte (limit 255) during the UI synchronization process, 
+			causing any quality higher than 255 (e.g., 600) to overflow and wrap around (e.g., 600 became 88).
+		- We implemented a "Bit-Packing" strategy where the UI patch hides the high-quality value inside the 
+			unused bits of the StartingEntityId integer (which survives the byte cast), and a second patch in AddCraftComplete 
+			unpacks that value to restore the correct quality just before the item is finalized.
+
+Version: 2.5.35.841
+	[ Challenges ]
+		- Added missing requirement check on BlockDestroyedByFire
+
+	[ Fire Manager ]
+		- Re-fixed(1)(2) fire extinguish being recursive.
+		- Also may have fixed the challenge for extinguish.
+
+Version: 2.5.30.1209
+	[ Challenges ]
+		- Removed debug lines
+
+	[ Quality ]
+		- Fixed an issue with ModifyCVar script not correctly calculating the quality tier levels.
+		- Added logging for crafting recipes where they lose their reference when crafting with the workstation closed.
+
+	[ EntityNPCBandit ]
+		- Removed some inappropriate checks, such as playerstat changed.
+
+Version: 2.5.25.1105
+	[ NPCs ]
+		- Fixed an issue where NPCs would duplicate on dedi, and respawn dupes when reloading the game.
+
+	[ UAI ]
+		- Fixed a bug where an NPC would sort of slide towards you rather than actually start running with you.
+		- Optimized the UAI Follow task to perform a bit better.
+
+	[ Challenges ]
+		- Reworked requirements for Challenges to work more smoothly with the game.
+
+		*** XML Change Required! ***
+
+		- Effect groups are now required for requirements.
+
+		BEFORE:
+        <challenge name="burntSurvivalPlantTrees" title_key="challengeBurntPlantTrees" icon="ui_game_symbol_tree" group="ScoreTest"
+                   short_description_key="challengeBurntPlantTreesShort" description_key="challengeBurntPlantTreesDesc"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="PlaceBlockByTagV2, SCore" count="25" description_key="xuiPlantTrees"/>
+            <requirement name="InBiome" biome="9"/>
+            <requirement name="BlockHasTags" tags="challenge_plant_trees"/>
+        </challenge>
+
+		AFTER:
+        <challenge name="burntSurvivalPlantTrees2" title_key="challengeBurntPlantTrees2" icon="ui_game_symbol_tree" group="ScoreTest"
+                   short_description_key="challengeBurntPlantTreesShort" description_key="challengeBurntPlantTreesDesc"
+                   reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            <objective type="PlaceBlockByTagV2, SCore" count="25" description_key="xuiPlantTrees"/>
+            <effect_group name="Groups are required">
+                <requirement name="InBiome" biome="9"/>
+                <requirement name="BlockHasTags" tags="challenge_plant_trees"/>
+            </effect_group>
+        </challenge>
+	
+
+Version: 2.5.20.1243
+
+	[ Event on Sleeper VOlume Cleared Update ]
+		- Added another null check
+
+	[ Shared XP ]
+		- Fixed an issue where NPC kills were not being shared, and causing crashes.
+
+	[ Fire Manager ]
+		- Fixed a recursion issue when extingushing on a dedi
+
+	[ WorldCanPlaceBlockAt ]
+		- Fixed a possible error when placing a land claim block
+
+	[ NPC Issues ]
+		- When an NPC is being picked up, the hired_ cvar is now removed. 
+			- When the NPC gets placed down, there's a new ID assigned, so it can create duplicates
+
+		- Note: Sometimes when placed down, an NPC will not move or be interactable. Still invesgigating the conditions in which this happens.
+
+	[ Challenges ]
+		- Modified the BlockDestroyed Challenge
+			- Fixed an issue where the challenge was registered for both destroyed AND change, so was triggering twice.
+			- Fixed an issue where the challenge would not register if you were not in a POI, even if you were not checking for POIs.
+
+
+Version: 2.5.10.2106
+
+	[ Event On Sleeper Volume Cleared Update ]
+		- Fixed a possible null reference when a zombie from a sleeper volume left the POI.
+
+Version: 2.5.2.1743 ( Experimental )
+
+	[ Update ]
+		- Updated calls to radius to radiussq() for buff radius
+		- Updated SCore's Requirement Challenge groups
+		- Changed TileEntityDewCollectors to target TileEntityCollector
+		- Updated tooltip for Advanced Item Repairs, which were using labels no longer available.
+
+
+Version: 2.4.73.2102
+	[ Troubleshooting ]
+		- Added a patch to EntityGroup.IsEnemyGroup to add more error checking, in case an entity group or entity isn't valid.
+			- This would throw a null reference with no hint on what the error was.
+
+	[ Challenges ]
+		- CraftWithIngredients - Now supports localization of the ingredient string
+
+	[ Quest ]
+		- FetchByTags now properly passes the Localization Description
+
+
+Version: 2.4.62.1047
+	[ EntityNPCBandit ]
+		- Merged fix for null reference on bodyDamage by Aevum11.
+
+	[ EntityAliveSDX ]
+		- Many fixes and code adjustments to preserve NPC's stats, inventory, and preferred weapon when pickup/deploy
+		- Fixed issue where items with mods would come back without mods.
+		- Added some safe guards to end of stream errors
+
+Version: 2.4.15.809
+	[ Challenges ]
+		- Fixed an issue where block destroyed by fire was not registering in SP
+
+	[ Quest ]
+		- Removed a debug log from the QuestActionTeleport
+	
+	[ Quality ]
+		- Added a patch so that the Trader Template code in traders.xml is parsed correctly for higher qualities.
+
+	[ Dynamic Music ]
+		- Added a patch to log if trader ID exceeds maximum allowed.
+
+Version: 2.4.11.1222
+
+	[ Quest ]
+		- Added new quest Action to teleport the player.
+		- This action relies on the Objectives for GotoPOISDX to set the position.
+
+           <objective type="GotoPOISDX, SCore" value="200-8000" phase="1">
+                <property name="completion_distance" value="50"/>
+                <property name="PrefabName" value="trader_jen"/>
+            </objective>
+
+		- By default, the teleport position will be in the SW corner of the POI.
+		- If the block property is set, it will attempt to teleport you to that block within the POI.
+		- If the blocK_tag property is set, and a block with the Tags is within the POI, that will be used as a position.
+		- If offset is specified, the position, regardless of how it was set, will be applied to the position.
+		- If the offset is 0,0,0, a random position will be calculated within 2 blocks of the position.
+        	<action type="Teleport, SCore">
+                <property name="block" value="radioHam" />
+                <property name="phase" value="1" />
+                <property name="delay" value="5" />
+                <property name="offset" value="0,0,0" />
+            </action>
+
+		- Notes:
+			- A delay is higly recommend to be set, even if it's 1. The objective will set up the initial position, and needs 
+				time to be calculated. Without the delay, the position may not be set in time for the teleport.
+			- The GotoPOISDX and Teleport Action should be in the same phase.
+			- In the case of a new location, blocks may not be in place yet to calculate an offset.
+				- This will have the effect that the SW corner will be used as a position.
+				- A potential work around is as follows, which sends the player, allows the world to rebuild, then move the player again.
+				   <action type="Teleport, SCore">
+						<property name="phase" value="1" />
+						<property name="delay" value="5" />
+						<property name="offset" value="0,0,0" />
+					</action>
+					<action type="Teleport, SCore">
+						<property name="block" value="radioHam" />
+						<property name="phase" value="1" />
+						<property name="delay" value="6" />
+						<property name="offset" value="0,0,0" />
+					</action>
+
+Version: 2.4.9.835
+	[ Quality ]
+		- Fixed an issue where some items would not have a quality when they should have, when not using the quality feature.
+
+Version: 2.4.8.1712
+	[ Item Actions ]
+		- Disabled adding additional actions to items.
+		- This was done in the past to allow NPCs to use more creative actions, but was never used.
+
+	[ Trader Placable ]
+		- Removed Debug statement.
+
+	[ Sleepers ]
+		- Fixed an issue with the Challenge for Clearing Sleepers that was also clearing quests.
+
+	
+
+Version: 2.4.7.833
+	[ Challenges ]
+		- Fixed an issue with Clear Challenges not properly reporting on dedi
+		- Fixed an issue where blocks destroyed by fire was not properly reporting on dedi.
+
+	[ Fire Manager ]
+		- Added a different call to trigger an event for a block destroyed by fire ( for challenge support ).
+		- Fixed an issue where blocks were not being properly destroyed on dedi.
+		- Fixed an issue with fire particles not spreading on dedi.
+
+	[ MinEvent ]
+		- Updated MinEventActionReplaceMaterial to take a comma delimited list of replace_materials to randomize them.
+
+	[ Item Degradation ]
+		- Fixed an issue where worn equipment wasn't properly breaking.
+
+	[ Quality ]
+		- Added new entry to blocks.xml to control the increase/decrease tiers for quality, called "QualityStage".
+		- Default is set to 25.
+		- When using quality tiers, the quality selector will increment up and down based on that value.
+		- Fixed an issue where quality seemed random when crafting, and not the selected crafting.
+
+	[ Food Spoilage ]	
+		- Fixed an issue with quality colours when using the extended quality.
+
+	[ Trader Areas ]
+		- Added a new patch to allow properly tagged blocks to be placed within a trader area.
+		- If a block has the tag "traderPlaceable", you may place it within the trader area.
+		- Blocks with this tag can also be repaired, damaged, etc.
+		- This patch does not rely on trader protection being off, or on.
+
+Version: 2.4.2.1406
+	[ Fire Manager ]
+		- Fixed (again) the fire manager from not breaking blocks on a dedicated server.
+
+	[ Blocks ]
+		- Fixed a null reference in a patch for CanPlaceBlockAt() when in Prefab editor
+
+	[ EntityAlive SDX ]
+		- Added a patch to try to catch the Null reference from GetQuestList()
+		- Updated the OnEntityActivated() to go through vanilla hooks instead of duplicated code.
+
+	[ XUiC Combine Grid ]
+		- Added code donated by dwallorde
+		- Reference :  controller="CombineGridMod, SCore"
+	
+	[ Game Events ]
+		- Added RequirementHasFailedQuest.
+			<action_sequence name="quest_XYZ_restart">
+				<requirement type="HasFailedQuestSDX, SCore" value="quest_XYZ" />
+				<action type="AddQuest" quest="quest_XYZ" />
+			</action_sequence>
+
+Version: 2.3.40.1113
+	[ Challenges ]
+		- Updated ClearedSleeper challenge to use the right hook, to fix possible dedi issues
+
+	[ One Block Crouch ]
+		- Changed the CVar check that the value of "NoOneBlockCrouch" must be greater than 0.
+
+	[ Item Degradation ]
+		- Moved check for Item Break up further, and added a debug statement.
+		- This debug statement will be removed in the next release if tested successfully.
+
+	[ Fire Manager ]
+		- Made a change to send block damage as it happens, instead of queueing
+		- This was made to fix an issue with blocks not showing damaged on dedi.
+		- This may cause some performance issues.
+	
+
+	
+Version: 2.3.37.1023
+	[ Item Degradation ]
+		- Added Biome support for onSelfItemDegrade / onSelfRoutineUpdate
+		- If IconTint is set to 255,255,255, no tint shall be applied, regardless of other checks.
+		- Added a check to see if the currently degraded item has met its max, and if so, trigger the break check.
+
+
+	[ onSelf Triggers ]
+		- Added Biome Support for the following triggers:
+			- OnLootContainerPicked
+			- OnSelfItemDegrade
+			- OnSelfItemRepaired
+			- OnSelfItemScrap
+			- OnSelfItemSold
+			- OnSelfPlaceBlock
+			- OnSelfQuestComplete
+			- OnSelfRoutineUpdate
+
+	[ Traders ]
+		- Added a patch to allow entities to stay within trader bounds if a cvar is set.
+		- If cvar "traderStayTicket" is greater than 0, the entity will not be teleported outside of the compound.
+		- This applies to any EntityAlive with the cvar set, be it player, npc, or zombies(?!)
+		- The trader closes and locks all the doors in their compound. You will not be able to open them.
+			- This was humourous. 
+		
+	[ SphereII Larger Parties ]
+		- Fixed an issue where exp gain was being calculated in a different spot, causing 0xp to be rewarded in large groups
+
+		
+Version: 2.3.35.1444
+	[ Item Degradation ]
+		- Added new MinEventAction that can be triggered from any trigger
+		- This action can search your bag, toolbelt, and equipment slots ( including biome badges ) on any triggers.
+		- You may filter it by specifying an item_name attribute or tags.
+		- Item_name is comma delimited, allowing you to specify multiple items.
+		- It will only degrade an item that meets its first condition.
+			- That is, the same item won't be degraded multiple times on the same trigger.
+		- item_name or tags can be omitted, as long as the other is listed.
+		
+		- Example:
+			<triggered_effect trigger="onOtherDamagedSelf" 
+				action="DegradeSpecificItemValueMod, SCore" item_name="myItem" tags="anytags" slots="equipment" />
+			<triggered_effect trigger="onSelfItemDegrade" 
+				action="DegradeSpecificItemValueMod, SCore" item_name="myItem" tags="anytags" slots="bags,inventory,equipment" />
+
+		- Added optional attribute for DegradeSpecificItemValue and DegradeItemValue
+		- This will degrade the item as per DegradationPerUse, plus an additional degradation that matches the override.
+		- Default is 0.
+			<triggered_effect trigger="onOtherDamagedSelf" 
+				action="DegradeSpecificItemValueMod, SCore" item_name="myItem" tags="anytags" slots="bags,inventory,equipment" DegradeOveride="50" />
+
+            <triggered_effect trigger="onSelfItemDegrade" action="DegradeItemValueMod, SCore" DegradeOveride="50"/>
+
+
+		- Fixed an issue where the helmet light would turn off. This was due to a triggered effect running too much.
+		- Modified code to deactive the item rather than xml. This must be refactored by removing:
+		- This xml code was turning off the head light, and it's not actually necessary.
+    		<append xpath="//item_modifier[@name='modArmorHelmetLight']">
+        	<!--
+        		<effect_group name="DamageHooks Deactivate">
+            		<requirement name="ItemPercentUsed, SCore" operation="LT" value="1"/>
+					<requirement name="IsItemActive"/>
+					<triggered_effect trigger="onSelfRoutineUpdate" action="LogMessage" message="DegradeItemValue:: HeadLight" />
+            		<triggered_effect trigger="onSelfRoutineUpdate" action="SetPartActive" part="HeadLight" active="false" />
+        		</effect_group>
+			-->
+    		</append>
+
+		- Changed a mod.HasQuality() check to a Mod.ShowQualityBar to allow degradation
+
+	[ Challenges ]
+		- Fixed an issue where Requirement Groups weren't being property parsed.
+
+	[ Quality Levels ]
+		- Fixed a null reference due to index out of bounds when accessing Creative menu
+
+Version: 2.3.34.1901
+	[ Quality Levels ]
+		- Initial implementation for Quality Tiers.
+		- New Configuration options under AdvancedItemFeatures
+			<property name="CustomQualityLevels" value="false" />
+			<property name="QualityLevels" value="0,700" />
+		- If CustomQualityLevels is set to true, then Quality will generate based on the range of QualityLevels.
+		- There may still be gaps in this patch, but it seems to mostly work.
+
+	[ SphereII Larger Parties ]
+		- Added a debug line to troubleshoot exp with large parties
+		- Removed the check on member list count.
+
+Version: 2.3.32.1830
+ 	[ Item Degradation ]
+		- Fixed an issue where onSelfItemRepaired, onSelfItemScrap, and onSelfItemDegrade was running twice: Once on the item, once on the player.
+			- This was double-firing the trigger.
+
+Version:  2.3.32.1604
+	[ Item Degradation ]
+		- Removed a block on only degrading an item if it was used as part of crafting.
+			- Now all mods will degrade when an item is being crafted
+	
+	[ Dialog ]
+		- Set the QuestGiverID as part of the DialogActionGiveQuestSDX, so that quest must be returned to that NPC.
+
+	[ Challenges ]
+		- Added a null check in CraftWithTags
+
+Version: 2.3.30.1720
+	[ Challenges ]
+		- Added new Challenges entry to AdvancedTroubleshootingFeatures to toggle advanced troubleshooting output
+
+	[ Item Degradation ]
+		- Fixed an issue where onSelfItemDegrade wasn't being called properly for item mods.
+
+
+Version: 2.3.28.928
+	[ Challenges ]
+		- Added troubleshooting to a few Challenge Group setting to help track down typos. 
+
+	[ Item Degradation ]
+		- Fixed an issue where armor mods were not being degraded properly.
+		- Added a new Class to the Config block for Item Degradation global values.
+            <property class="ItemDegradation">
+				<!-- Default tint to apply to broken item -->
+                <property name="BrokenTint" value="210,0,0" />
+				<!-- if set to false, mods must be removed and repaired independently of the item in which they are attached too -->
+                <property name="RepairModsWithItem" value="true" />
+            </property>
+
+		- Added support for damaging mods on EntityVehicles when they get damaged.
+		- Added support for reducing durability of the vehicle headlight if left on.
+ 		- Added new option for MinEventActionRoutineUpdate to take a 'vehicle' parameter. 
+			- This tells the MinEvent that it should only run on a vehicle.
+
+	[ EntityAliveSDX ]
+		- Added a potential fix for the GetQuestList() null reference being reported when talking with NPCs at night.
+
+	[ SphereII Item Degradation Mod ]
+		- New buffRoutineVehicleUpdateTrigger buff to support degrading mods on vehicles when left on
+		- Added new buff to any entity starting with vehicle.
+		- Added xml to support vehicle head light
+
+	[ SphereII LArger Parties ]
+		- Fixed a potential issue when the Party was being set to full when it was not.
+
+Version: 2.3.23.913
+	[ EntityAliveSDX ]
+		- Added a new CheckLeaderProximity check.
+		- A hired entity will allow allied players to 'phase' through them if they are too close, allowing you to run past them in tight spots.
+		
+	[ Crop Manager ]
+		- Fixed an issue where sprinkler range was not being considered for plant growth.
+
+	[ Custom Trader Currency ]
+		- Added a patch to block the sale of a custom currency to the trader with the custom currency
+		- If a trader takes old cash, you will no longer be able to sell it old cash at a profit.
+
+Version: 2.3.20.707
+	[ Advanced Scrapping ]
+		- Fixed an issue where items failed to scrap properly if no recipes were defined.
+		- Moved logic for getting the recipe to the bottom of the logic conditions.
+
+Version: 2.3.19.1401
+	[ Trader Currency ]
+		- Fixed an issue with custom currency where the Sell options were returning default currency, and not the custom one.
+
+	[ Challenges ]
+		- Added a null check on the CraftWithIngredient
+
+	[ EntityAlive SDX ]
+		- Added a try catch to track down a bad error when talking to NPCs.
+
+Version: 2.3.18.1533
+	[ Vehicles ]
+		- Added the ability to change the type of fuel a vehicle can use.
+		- Add a new property to vehicles.xml to add support.
+			<configs>
+				<append xpath="//vehicle[@name='vehicleMinibike']/property[@class='fuelTank']">
+					<property name="fuelType" value="drinkJarRiverWater" />
+				</append>
+			</configs>
+		- Items being used must have FuelValue property on it
+			<append xpath="//item[@name='drinkJarRiverWater']">
+				<property name="FuelValue" value="100" />
+			</append>
+
+	[ Additional Output ]
+		- Added more biome checks to be used for requirements.
+
+	[ Wireless Powered Workstation ]
+		- This feature allows you to require workstations to have a nearby power source.
+		- Added a new XUiC_WorkstationFuelGridSDX.
+		- This is paired with a new windowFuelPoweredSDX, which is included in 0-SCore's Config/XUi/windows.xml.
+			- The window can be changed to whatever you need to, as long as the controller reference remains in tact.
+		- Instead of "Fuel" it shows "Power". This is defined by the Localization entry: xuiNeedPower
+		- This disables the ability to manually add fuel, and instead relies on the Powered Workstation Feature's:
+	        <property name="RequirePower" value="true" />
+		- This also requires the Configuration Block setting "EnablePoweredWorkstations" to be true:
+		    <set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='AdvancedWorkstationFeatures']/property[@name='EnablePoweredWorkstations']/@value">true</set>
+
+
+
+Version: 2.3.16.1209
+	[ Item Degradation ]
+		- Changed default DegradationPerUse from the test value 100 back to 1.
+
+	[ Additional Output ]
+		- Re-Added support for requirements. 
+		- This still needs to be tested on a dedi. Not all requirements may work.
+		- My test XML:
+		<append xpath="/recipes/recipe[@name='drinkJarRedTea']">
+			<effect_group name="Additional Output">
+				<triggered_effect trigger="onSelfItemCrafted" action="AddAdditionalOutput, SCore" item="foodCropPumpkin" count="4">
+					<requirement name="RandomRoll" seed_type="Random" min_max="0,100" operation="LTE" value="50"/>
+				</triggered_effect>
+			</effect_group>
+		</append>
+
+Version: 2.3.15.2120
+	[ Maintenance ]
+		- Fixed GetBindingValue references to GetBindingValueInternal for 2.3b8
+
+Version: 2.3.14.1308	
+	[ Fire Manager ]
+		- Added a check to make sure we are on the main thread before trying to do particles.
+
+	[ Food Spoilage ]
+		- Fixed an issue where food spoilage was being calculated, but not applied, until after pulled from preserved container.
+	
+	[ OnBought / OnSold
+		- Added a null reference check for possible failure.
+
+Version: 2.3.12.1652
+	[ Challenges ]
+		- Added description_key to the Clone() call for ClearSleepers
+		- Added buff requirements to Big Fire Challenge
+		- Added buff requirements to Start Fire Challenge
+		- Fixed an issue with Extinguish Challenge not counting
+		- Fixed BlockDestroyedByFire challenge by connecting to the right event, rather than an event that never was called.
+
+	[ Maintenance ]
+		- Renamed a file that was mispelled
+
+Version: 2.3.12.844
+	[ Recipes ]
+		- Fixed additional Output recipes to work on servers
+
+	[ Item Degradation ]
+		- Added documentation.
+
+	[ Project Clean up ]
+		- Fixed broken, incorrect, and not-necessary dependencies in vcproj.
+
+Version: 2.3.11.1608
+	[ One Block Crouch ]
+		- Fixed an issue with the cvar check being done too early to be ineffective.
+		- Refactored implementation.
+
+	[ Item Degradation ]	
+		- Fixed an issue where a bad localization was being displayed when Learn by Doing was not available.
+		- added a localilzation entry to tag broken tool's Broken on the tooltip
+		- Added degradation in the worokstations to prevent crafting when a mod is degraded.
+		- Currently, after each recipe that is crafted, the tool requirement will degrade.
+
+	[ Additional Output ]
+		- Fixed a null reference when some player data wasn't available.
+
+	[ New Script ]
+		- Added guppycur's randomAnimationScript
+		- This script is designed to trigger a random animation on an associated Animator component every five minutes 
+			of in-game time. It is a time-based animation controller, useful for adding subtle, random environmental 
+			or character animations without relying on complex state machines or frequent, performance-heavy checks.
+
+
+Version: 2.3.10.1017
+	[ Learn By Doing ]
+		- Fixed an issue with CanPurchasePerk to be more accurate.
+		- Added two new patches to the SkillCraftingINfoWindow, and SkillPerkInfoWindow
+			- It reads the localization entry, if it exists, and populates the perk window when a level is not displayed.
+			- Format:
+				attStrengthLearnByDoingDesc,"Progress your strength by performing any strength-related action."
+
+	[ Fire Manager ]
+		- Fixed a possible null ref in AddExtinguishPosition
+
+	[ Recipes ]
+		- Fixed an issue where work stations were not generating additional outputs when the workstation was closed.
+
+	[ Documentation ]
+		- Added csv documentation
+
+	[ Item Degradation ]
+		- Added a BlockEffectsManager
+		- This adds the ability to read and keep track of any effect_groups that are part of its blocks.xml
+		- Currently, only onSelfItemDegrade trigger is hooked to as part of the Item Degradation effort.
+		- In this case, we wanted to degrade active workstations over time. However the most practical hook was on the TileEntity's UpdateTick.
+		- This happens too frequently, so by adding in support for effect_groups, we can add in further requirements through xml.
+		- For Example: 
+
+   			<append xpath="//block[@name='workbench']">
+        		<property name="DowngradeBlock" value="cntCollapsedWorkbench"/>
+        		<property name="DegradationPerUse" value="1"/>
+        		<effect_group name="DamageHooks Degrade">
+					<!-- Random roll rather than every tick -->
+            		<requirement name="RandomRoll" seed_type="Random" min_max="0,100" operation="LTE" value="10"/>
+
+					<!-- This is called only when the workstation is active -->
+            		<triggered_effect trigger="onSelfItemDegrade" action="LogMessage" message="Damaging Block" />
+            		<triggered_effect trigger="onSelfItemDegrade" action="DamageBlock, SCore"/>
+        		</effect_group>
+    		</append>
+
+	[ SphereII Learn By Doing ]
+		- Added Readme.md detailing changes for history log.
+		- Added a line to the Grandpa's Forgettin' elixir to call the Init buff, to reset progression.
+		- Set every perk to have a To Next Level of 1200.
+		- Set all base action xp to 1. Special or Power action is set to 5.
+		- Set every attribute to have a To Next Level of 5000.
+		- Removed errant cvars in Intellect/Init.xml that re-set the buff.xml's cvars
+		- Added localization entries for each perk / attribute, describing what needs to be leveled up.
+		- Changed Level Up Checks to use the ShowToolBelt message, with Localizationentries added.
+		- Fixed hard coded references of 1.2 and 1.3, and converted them to using curve_multiplier
+		- Fixed missing Javelin level up logic
+		- Added automatic version numbers.
+
+	[ SphereII A Better Life ]
+		- Fixed an issue with the block spawners not spawning fish.
+		- Added automatic version numbers.
+
+Version: 2.3.7.1356 - Experimental
+	[ Random Sizes ]
+		- Fixed a few issues with Random Sizes not doing Random Sizes.
+
+	[ File Management ]
+		- Removed Readme.txt and ModInfo.txt
+
+	[ Soft Hands ]
+		- Added new Configuration block setting
+                <property name="CheckHandArmor" value="true" />
+		- If this is set to true, Soft Hands will be negated if the player is wearing gloves.
+		- If this is set to false, then the player will take damage from hitting globes with just their hands.
+
+	[ SphereII Item Degradation ]
+		- Fixed an issue where pistol would re-holster on update
+
+	[ Challenges ]
+		- Added check for a null reference on Sleeper Volume Group Count for ClearedUpdate event.
+
+Version: 2.3.6.1759 - Experimental
+	[ Challenges ]
+		- Fixed another issue with the V2 tags.
+			- The side effect may have been re-ordering of challenges.
+		- Added PlaceBlockByTagV2
+			<challenge name="burntSurvivalPlantTrees" title_key="challengeBurntPlantTrees" icon="ui_game_symbol_tree" group="ScoreTest"
+					short_description_key="challengeBurntPlantTreesShort" description_key="challengeBurntPlantTreesDesc"
+					reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+				<requirement name="InBiome" biome="9"/>
+				<requirement name="BlockHasTags" tags="wood"/>
+				<objective type="PlaceBlockByTagV2, SCore" count="25" />
+			</challenge>
+		- Changed CVar event for CVar Challenges to not look at the super spammy _CvarName's
+
+	[ OneBlock Crouch ]
+		- Added a check for a cvar that will block the One Block Crouch:
+			NoOneBlockCrouch
+		- If this cvar is set to anything greater than 0, the OneBlock Crouch will be blocked.
+
+Version: 2.3.5.2007 - Experimental
+	[ Shared Reading ]
+		- Refactored shared reading to be more reliable.
+			- Tested on Client, Client -> Server, and Server -> Client(s)
+
+	[ Advanced Repairs ]
+		- Fixed an issue with Advanced Repairs not showing the pop up when items are not available.
+
+	[ Challenges ]
+		- Fixed an issue with CVarV2's Localization not being cloned properly.
+		- HarvestV2 was cleaned out as empty Challenge.  Harvest supports the <requirements now.
+		- Fixed a localization issue with ClearSleepers.
+
+	[ Item Degradation ]
+		- Work is ongoing for this project, but proceeding slowly.
+
+	[ XML Patching ]
+		- Added to the XmlPatcher to help avoid some repetitiveness for item degradation.
+		- This will replace the ref_file node with everything inside the passed in label.
+		- You probably don't want to use this.
+		- If label is not specified, the entire file contents is merged (minus the root node )
+    
+			<append xpath="//item[starts-with(@name,'tool')]">
+        		<!-- Read the snippet file, and merge all the Snippet nodes that match the label. -->
+        		<!-- If label is omitted, the file itself will be merged, minus the root node -->
+        		<ref_file snippet="ItemModifiers/StandardSettings.xml" label="StandardActiveSettings, StandardSettings"/>
+			</append>
+
+		With StandardSettings.xml:
+			<configs>
+			
+				<!-- Actively degrades when the item is considered active -->
+				<Snippet label="StandardActiveSettings">
+					<effect_group name="DamageHooks">
+						<requirement name="ItemPercentUsed, SCore" operation="LT" value="1"/>
+						<requirement name="IsItemActive"/>
+						<triggered_effect trigger="onSelfRoutineUpdate" action="DegradeItemValueMod, SCore"/>
+					</effect_group>
+			
+					<effect_group name="BrokenHooks">
+						<requirement name="ItemPercentUsed, SCore" operation="GTE" value="1"/>
+						<requirement name="IsItemActive"/>
+						<triggered_effect trigger="onSelfRoutineUpdate" action="AddBuff" buff="buffStatusModBroken"/>
+					</effect_group>
+				</Snippet>
+			
+				<Snippet label="StandardSettings">
+					<!-- Enable Quality  -->
+					<property name="ShowQuality" value="true"/>
+
+
+Version: 2.3.2.1055 - Experimental
+	[ General ]
+		- Rebuilt against 2.3
+
+	[ UAI / EAI ]
+		- Fixed broken references to RandomPositionGenerator's Calc calls.
+
+	[ XML Parsing ]
+		- Added experimental xml hook. Don't use it.
+
+Version: 2.2.17.929
+	[ Challenges ]
+		- Added ObjectiveCVarV2 for better localization support and buff requirement hooks
+			<objective type="CVarV2, SCore" cvar="player_m_desert" count="5000" cvar_override="xuiCVar" description_key="xuiTravel"/>
+		- Further added coded to HarvestV2 to actually do stuff, rather than auto-commit.
+
+	[ Buff requirements ]
+		- Modified the new ItemPercentUsed requirement to support an optional tracked_item attribute
+		- This tracked_item is the unlocalized name of the item, and will help in troubleshooting.
+		- This attribute controls *logging*, and has no function beyond that.
+		- If this attribute exists, and if the item being checked is the same, then a printout in the log appear
+            Log.Out($"ItemValue: {_params.ItemValue.ItemClass.GetItemName()} :: {_params.ItemValue.UseTimes} / {_params.ItemValue.MaxUseTimes}");
+
+
+Version: 2.2.15.160 
+
+	[ Challenges ]
+		- Added support for the <requirements for ClearSleepers challenge
+
+	[ Item Degradation ]
+		- In continuation for item degradation, more hooks have been added.
+		- ItemDegradationHelpers provides a few methods such as CanDegrade, IsDegraded, and CheckModification, which handles item degradation
+		- Added hooks to allow Item Mods to degrade and stop being effective
+		- Added patches to DewCollector, Workstation UpdateTick to degrade mods, if they are set to degrade.
+		- See SphereII Item Mod Degradation for details.
+
+	[ Triggered Events ]
+		- Added onSelfItemDegrade trigger on an ItemValue.
+		- Added OnSelfRoutineUpdate to trigger on an ItemValue
+		- Updated OnSelfItemRepaired to also repair attached Mods, if applicable.
+		
+	[ Requirements ]
+		- Added a new ItemPercentUsed requirement, which checks the Used Times vs Max Times.
+			<requirement name="ItemPercentUsed, SCore" operation="LTE" value="0.5"/>
+
+	[ MinEvent Action ]
+		- Aded a new RoutineUpdate action. This will cycle through all the passed in slots to trigger any onSelfRoutineUpdate triggers on each item.
+			<!-- Will run on player's equipment, backpack, and tool belt -->
+			<triggered_effect trigger="onSelfBuffUpdate" action="RoutineUpdate, SCore" slots="bag,inventory,equipment"/>
+
+	[ SphereII Learn By Doing ]
+		- Refactored Master Perk for each attribute to not be so dumb, and avoids the Red Checkmarks.
+
+	[ SphereII Item Mod Degradation ] - New Mod
+		- Created new modlet to show support for Item Mod Degradation.
+		- This is not balanced, and not really meant to be used as-is.
+		- Enables Item Mod degradation for all items in armour, items, and workstations.
+		- Some mods degrade over time, such as the Dew Collector, while others are more active, such as Forge and Campfire.
+		- A Completely degraded item will have:
+			- it's item colour tinted with the BrokenTint property on the item class.
+			- It's passive effects will be disabled, through a requimrent for ItemPercentUsed
+			- A sound will play from it being broken.
+		- An item being repaired will also repair all mods using the same repair item.
+		- Individual item mods can be repaired with resourceRepairKit
+		- Item Mods also have quality with a range of durability.
+
+		- A buff is placed on the player when they enter the game, "buffRoutineUpdateTrigger".
+		- This buff is an example buff that will do an update_rate of 100 by default.
+		- Each time the buff updates, it'll trigger a RoutineUpdate call on bag, inventory, and equipment items.
+		- Any time with the onSelfRoutineUpdate trigger event will fire.
+
+		- Some items, such as the water purifier, will degrade as you drink murky water.
+
+		- This modlet is not complete. It isn't even really good. But it shows all the xml necessary to pull off.
+
+
+Version: 2.2.12.1420
+	[ Requirements ]
+		- Added new CanPurchasePerk requirement to replace RequirementIsProgressionLocked.
+		- This seems to fire more accurately than the old one.
+			<requirement name="CanPurchasePerk, SCore" progression_name="attPerception" />
+
+	[ SphereII Learn By Doing ]
+		- Reordered Strength for logging to work
+		- Replace RequirementIsProgressionLocked with CanPurchasePerk
+			( Note: SCore version MUST be above 2.2.12 for this to work )
+
+	[ Shared Reading ]
+		- Fixed an issue where SharedReading gave more books than necessary. Maybe.
+
+Version: 2.2.11.825
+	[ Quest ]
+		- Fixed an issue with the ObjectiveFetchByTags not propagating Tags properly.
+			- Literally its only point, and it couldn't even do that.
+	
+	[ DegradeItemValue ]
+		- Added null check to itemvalue.
+
+	[ SphereII Learn By Doing ]
+		- Fixed a PackMule issue where the triggers were doubled up.
+		
+
+	[ SphereII Item Mod Degradation ]
+		- Added a testing modlet for item mod degradation
+		- Added special degradation for Helmet Light
+		- Added special degradation for Water Purifier
+
+	[ SphereII A Round World ]
+		- Moved Item Mod Degradation out into it's own modlet.
+
+Version: 2.2.10.953
+	[ Item Degradation ]
+		- Fixed an issue where a sound would play constantly.
+		- Added a patch to ItemValue's FireEvent, to cascade events through item mods, allow item_modifers to have events.
+	
+Version: 2.2.9.1016
+	[ Learn By Doing ]
+		- Fixed an issue with the IsProgressionLocked Requirement  
+			- This bug caused red checkmarks
+
+	[ SphereII Learn By Doing ]
+		- Fixed an issue with RuleOneCardio not using the proper cvars
+		- Changed all the open loot container triggers to onSelfCloseLootContainer for dedi-compliant.
+			- The others do not trigger on dedi
+			- This affected LuckyLooter, Decay, Perception, The Infiltrator, and Treasure Hunter
+
+	[ SphereII A Round World ]
+		- Added example item_modifers and buff for degradation.
+		- Removed food loot remove.
+
+Version: 2.2.8.1701
+	[ Item Degradation ]
+		- Added a patch for fun-sies to degrade item modifications.
+		- If an item_modifier has Quality, then a patch will trigger to degrade the durability of the item_modifier
+		- It works by looping around each modification, degrading it per its passive_effect.
+		- Once the degradation is complete, an item will either break, or its passive effects will be disabled.
+		- You can use the new ItemModDurability requirement in item_modifications to control it
+		- See Documentation/Examples/ItemDegradation.md
+		
+	[ Passive Effect Hooks ]
+		- Fixed a bug that triggered a crash when repairing a vehicle, then picking it up.
+
+	[ Buff requirements ]
+		- Made a buff requirement that checks mod durability.
+			<requirement name="ItemModDurability, SCore" operation="GTE" value="0.1"/>
+ 
+	[ Challenges ]
+		- Added patch to base CheckBaseRequirements() to support requirements. This works for all challenges.
+			- This works on the same principles as the buff requirements.
+		- Restructured the Requirement Checks to include the Player's MinEventContext.
+
+		- Created two new simplified Challenges for testing. 
+			- You would need to define the localization entry for each one.
+			<challenge name="Kill01" title_key="KillWithDeepCuts" icon="ui_game_symbol_wood" >
+				<requirement name="HoldingItemHasTags" tags="perkDeadEye"/>
+				<requirement name="HitLocation" body_parts="Head" />
+				<objective type="KillV2, SCore" count="200" />
+			</challenge>
+
+        	<challenge name="Harvesting02" title_key="Harvesting" icon="ui_game_symbol_wood" >
+            	<requirement name="RequirementBlockHasHarvestTags, SCore" tags="allHarvest,oreWoodHarvest"/>
+            	<requirement name="HoldingItemHasTags" tags="miningTool,shovel"/>
+            	<objective type="HarvestV2, SCore" count="200" />
+        	</challenge>
+
+Version: 2.2.7.1936
+	[ Challenges ]
+		- Fixed an issue in the KillByItem challenge which was automatically failing its biome check,
+			even if a biome check wasn't there.
+
+Version: 2.2.7.1848
+	[ Challenges ]
+		- Added preliminary support for <Requirements in challenges
+		- Added to the following Challenges:
+			EnterPOI, SCore
+			KillWithItem, SCore
+			StealthKillStreak, SCore
+
+		- Example:		
+		       <challenge name="enterPOI4" title_key="EnterPOI3" icon="ui_game_symbol_wood" group="ScoreTest" short_description_key="challengeGathererWoodShort" description_key="challengeGathererWoodDesc" reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+    		        <objective type="EnterPOI, SCore" prefab="abandoned_house_04" count="10"/>
+            		<requirement name="IsDay" />
+               </challenge>
+
+			   <challenge name="enterPOI5" title_key="EnterPOI5 Night" icon="ui_game_symbol_wood" group="ScoreTest" short_description_key="challengeGathererWoodShort" description_key="challengeGathererWoodDesc" reward_text_key="challenge_reward_1000xp" reward_event="challenge_reward_1000">
+            	 	<objective type="EnterPOI, SCore" prefab="abandoned_house_04" count="10"/>
+        	    	<requirement name="!IsDay" />
+		       </challenge>
+
+	[ SphereII Learn By Doing ]
+		- Removed invalid Decay on Miner69er and RuleOneCardio
+		- Added xp gain for turrets beind held
+		- Removed invalid Decay on RepairTools
+		- Cleaned up misaligned Miner69 requirements, which was causing it to fire more often then it needed too.
+
+Version: 2.2.6.1649 Pre-Release
+
+	[ Triggered Events ]
+		- Added more support for OnSelfItemBought, and OnSelfItemSold
+		- onSelfItemSold supports the following cvars:
+			_totalSold:  The number of items sold at once
+			_sellPrice:  The total value of the sale.
+		- onSelfItemBought supports the following cvars:
+			_totalBought : The number of items bought at once
+			_buyPrice: The total value of the buy.
+
+        <requirement name="CVarCompare" cvar="_sellPrice" operation="GT" value="20"/>
+
+	[ Explosions ]
+		- Added in a patch to EntityAlive.FireEvent for onSelfExplosionDamagedOther, and onSelfExplosionAttackedOther
+		- These were only firing when the entity was local, so they did not fire when executed on a dedicated server.
+		- These triggers will work now on dedi.
+		- This also fixes the Demolitions' Perk in the Learn by Doing
+
+	[ Turrets ]
+		- Similarly, attacks from a place turret would not give credit to the player for Learn by Doing.
+		- This has been fixed.
+
+	[ Learn By Doing ]
+		- Updated Better Barter to work with the new event hooks
+		- Updated Demolition perk to work with the new event hooks
+		- Updated Turrets to work with the new event hooks
+		- Uncommented the Decay component in General perk.
+
+Version: 2.2.5.1216 Pre-Release
+
+	[ Challenges ]
+		- Added new Clear Sleeper Volume Challenge
+			<objective type="ClearSleepers, SCore" biome="pine_forest" count="200" />
+	
+	[ Fire Manager ]
+		- Many tweaks and performance updates to handle particles
+		- Added a new FireBlockData to help manage data a bit better
+		- Adjusted CheckInterval rate so the interval will include the time it takes to process.
+			- Example:  If CheckInterval is 20 seconds, but it takes 10 seconds process all the fires, 
+				the CheckInterval will be 30 seconds since the start of the previous one. 
+		- Fixed an issue with Random Fire Particles
+		- Added a default RandomFireParticle
+
+Version: 2.2.2.1139 Pre-Release
+	[ Documentation ]
+		- Fixed conditional example for the xpath() format
+		- Fixed Challenge Objective PlaceBlockByTag's documentation
+			- Previously, it was referenced as BlocKPlaceByTag.
+
+	[ 2.2 Update ]
+		- Updated to build and work against 2.2
+		- Fixed Updated rainfall / snowfall call to weather manager.
+			- Plant and FireV2 updated.
+		- Updated the AIDIrectorChunkEventComponentScout patch
+
+	[ SphereII Learn By Doing ]
+		- Refactored Crafting Skills to remove Decay from the main xml files
+		- Added a Crafting_Decay.xml that handles all decaying properly
+			- This fixes an issue where a crafting book may have to be read multiple times to work
+		- Updated DeepCuts, RuleOneCardio, Electrocutioner for fixes on power attack.
+
+Version: 2.1.20.931
+
+	[ Quests ]
+		- Added FetchByTags, which triggers when the item with the specified tag is added to the inventory.
+           <objective type="FetchByTags, SCore" value="5" phase="1">
+                <property name="tags" value="ore" />
+            </objective>
+
+	[ Localization ]
+		- Added German and Russia as a localization option.
+
+	[ SphereII Learn By Doing ]
+		- Fixed many issues as reported by arramus
+		- Added more Secondary Attacks
+		- Note: Some problems exists on the dedi that do not allow the flow of learn by doing, including turrets and explosions.
+
+Version: 2.1.18.1319
+	[ Triggered Event Hooks Up ]
+		- Added OnSelfItemScrap support
+			<triggered_effect trigger="onSelfScrapItem" action="LogMessage" message="LBD DEBUG: Crafting Harvesting ">
+				<requirement name="ItemHasTags" tags="miningTool,toolAxe,toolShovel"/>
+			</triggered_effect>
+
+		- Renamed onRecipeCrafted to onSelfCraftedRecipe
+			- This is the same as OnRecipeCrafted, but just named better.
+
+		- Added to the onSelfItemRepair to include two Meta data's "DamageAmount" and "PercentDamaged". 
+			This is how much the item was used before the repair was started.
+
+		- Added two cvars for OnSelfItemBought / onSelfItemSold that tracks the current value and the previous value.
+			_item_value is the current value sold
+			_last_item_value is the previous value sold.
+
+	[ OnRecipeCrafted ]
+		- Fixed an issue when the craft area was empty.
+
+	[ Buffs ]
+		- New Requirements: ( shaking up the format )
+		- ItemHasProperty
+			<!-- Returns true if the item has a property called UnlockedBy, with a value of craftingHarvestingTools" -->
+			<requirement name="ItemHasProperty, SCore" property="UnlockedBy" prop_value="craftingHarvestingTools" />
+
+			<!-- Returns true if the item has a property called UnlockedBy, regradless of value. -->
+			<requirement name="ItemHasProperty, SCore" property="UnlockedBy" />
+
+		- ItemHasQuality
+			<requirement name="ItemHasQuality, SCore" operation="Equals" value="4"/>
+	
+		- ItemPercentDamaged
+			<!-- Returns true if the usage is greater than 50% -->
+			<requirement name="ItemPercentDamaged, SCore" operation="GTE" value="0.5"/>
+
+		- BlockHasDestroyTags
+			<!-- returns true if the active block is called plantedGraceCorn1 -->
+			<!-- This supports comma delimited values, and *'s -->
+			<requirement name="BlockHasDestroyName, SCore" block_name="plantedGraceCorn1" />
+			<requirement name="BlockHasDestroyName, SCore" block_name="planted*,blockTree*" />
+	
+		- BlockHasName
+			<!-- true if the active block is called one of these things. -->
+ 			<requirement name="BlockHasName, SCore" block_name="DewCollector*,Workbench*,ChemistryStation*,CementMixer*" />
+
+		- RecipeHasIngredients
+			<!-- true if the ingredients match any of the current recipe -->
+  			<requirement name="RecipeHasIngredients, SCore" ingredients="planted*" />
+			<requirement name="RecipeHasIngredients, SCore" ingredients="plantedCotton1,plantedCoffee*" />
+
+	[ Quests ]
+		- ObjectiveRandomPOIGotoSDX 
+			- Fixed an issue where if multiple POIs were found, it would just take you somewhere random.
+
+	[ Fire Manager ]
+		- Removed the particle optimizer to see if ghost fires will disappear.
+
+	[ Blocks.xml ]
+		- Added missing .prefab for model for PathingBlocks
+	
+	[ SphereII Learn By Doing ]
+		- Completed CraftingSkills Learn by Doing.
+		- No balancing yet.
+		- Fixed a null reference
+
+Version: 2.1.13.1557
+	[ EntityAlive ]
+		- Added a Harmony patch to print all the Events being triggered on an EntityAlive.
+		- To activate, open console and type in:
+			setcvar $fireeventtracker <entityId>
+
+			setcvar $fireeventtracker 172
+
+		- To deactivate, setcvar $fireeventtracker 0
+	
+	[ Triggered Event Hook Ups ]
+		- Added the ability to add custom triggers in SCore. (Features/PassiveEffectHooks/)
+		- Added the following to the triggered events to support Learn by doing.
+			- onSelfLockpickSuccess
+				<!-- Also works with Locks modlet -->
+				<triggered_effect trigger="onSelfLockpickSuccess" action="LogMessage" message="Lock Pick successful">
+			- onSelfItemBought
+				<triggered_effect trigger="onSelfItemBought" action="LogMessage" message="Bought Something" />
+			- onSelfItemSold
+				<triggered_effect trigger="onSelfItemSold" action="LogMessage" message="Sold Something" />
+			- onSelfQuestComplete
+				<triggered_effect trigger="onSelfQuestComplete" action="LogMessage" message="Ques Complete" />
+			- onSelfItemCrafted
+				<!-- 
+					This will fire each time an item completes crafting. In the case of workstation,
+					it will fire when the player opens the workstation.
+				-->
+					
+				<triggered_effect trigger="onSelfItemCrafted" action="LogMessage" message="Item Was Crafted" />
+			- onSelfCraftedRecipe
+				<!-- Sets the CraftArea meta field to be used with the   RequirementRecipeCraftArea below -->
+				<!-- This will only fire if you have the workstation open -->
+				<triggered_effect trigger="onRecipeCrafted" action="LogMessage" message="Recipe Was Crafted" />
+			- onSelfItemRepaired
+				<triggered_effect trigger="onSelfItemRepaired" action="LogMessage" message="Item Was Repaired" />
+
+	[ Buff Requirements ]
+		- Added the following requirements for onSelfItemCrafted:
+			- RequirementRecipeCraftArea
+				<!-- The recipe has to come from one of these work stations -->
+				<requirement name="RequirementRecipeCraftArea, SCore" craft_area="forge,workstation,chemistryStation" />
+			
+	            <triggered_effect trigger="onRecipeCrafted" action="ModifyCVar" cvar="$attintellect_lbd_xp" operation="add" value="@($lbd_xp_attribute_synergy_base)">
+    	            <requirement name="RequirementRecipeCraftArea, SCore" craft_area="forge,workstation,chemistryStation"/>
+        	        <requirement name="NotHasBuff" buff="buffLBD_attIntellect_XPCoolDown"/>
+	            </triggered_effect>
+
+			- RequirementRecipeHasLongCraftTime
+				<!-- The crafting time must be longer than 100 seconds -->
+				 <requirement name="RequirementRecipeHasLongCraftTime, SCore" operation="GTE" value="100" />
+
+		        <triggered_effect trigger="onSelfItemCrafted" action="ModifyCVar" cvar="$perkmasterchef_lbd_xp" operation="add" value="@$lbd_xp_masterchef_longcraft_bonus">
+        	        <requirement name="RequirementRecipeHasLongCraftTime, SCore" operation="GTE" value="60" />
+            	    <requirement name="NotHasBuff" buff="buffLBD_perkMasterChef_XPCoolDown"/>
+            	</triggered_effect>
+
+			- RequirementRecipeHasTags
+				<requirement name="RequirementRecipeHasTags, SCore" tags="perkGreaseMonkey" />
+           		<triggered_effect trigger="onSelfItemCrafted" action="ModifyCVar" cvar="$attintellect_lbd_xp" operation="add" value="@($lbd_xp_attribute_synergy_base)">
+                	<requirement name="RequirementRecipeHasTags, SCore" tags="perkGreaseMonkey"/>
+                	<requirement name="NotHasBuff" buff="buffLBD_attIntellect_XPCoolDown"/>
+            	</triggered_effect>
+
+	[ SphereII Learn By Doing ]
+		- Completed initial work on adding learn by doing for each attribute / perk.
+		- Added documentation for Learn by Doing
+		- Added Decay mechanic, where skills will decay if you don't use them.
+
+Version: 2.1.9.1904
+	[ Requirements ]
+		- Fixed an issue where BlockhasHarvestTags was not working
+
+	[ SphereII Learn By Doing ]
+		- XML fixes, tweaks, and adding IsAlive to various checks.
+
+Version: 2.1.9.1708
+	[ MinEventActionCreateItem ]	
+		- Added a new attribute to be read from XML to set the actual loot list.
+			<triggered_effect trigger="onSelfBuffRemove" action="CreateItemSDX, SCore" lootgroup2="LootList" count="1" />
+		- The original lootgroup="" actually refers to the loot container id. This is unchanged for backward compatibility.
+	
+	[ MinEventAction Set investigation position ]
+		- New triggered effect that will set the Investigation position of all surrounding entities.		
+			<triggered_effect trigger="onSelfBuffUpdate" action="SetInvestigationPosition, SCore" target="positionAOE" range="10" ticks="100" />
+
+	[ MinEventActionShowPerkLevelUp ]
+		- Added a new MinEventActionShowPerkLevelUp. Designed to be used by Learn By Doing.
+			<triggered_effect trigger="onSelfBuffStart" action="ShowPerkLevelUp, SCore" perk="perkPummelPete"  sound="read_skillbook_final" />
+	[ XUiC ]
+		- Added a new patch for SkillEntry, to include a progress bar.
+
+ 	[ SphereII Learn By Doing ]
+		- Restructured the Perception Perks
+		- Added Strength Perks
+		
+
+Version: 2.1.8.1723
+	[ Fire Manager ]
+		- Move sending blocks to clients more regularly, rather than waiting until all fire blocks were processed.
+			- Previously, this was only sent when all blocks were processed, which could be 10 seconds or so for larger fires.
+		- Added an additional Stop Sound in case there was a fire sound playing, but no fires left (ie, from tree falling down)
+
+	[ Challenges ]
+		- Fixed a potential null check on biome check in KillWithItem
+
+	[ Triggered Effects Hooks ]
+		- Cleaned up various trigger calls to unhooked up vanilla triggers under Features\PassiveEffectHooks
+		- Added onSelfHarvestOther
+		- Added onSelfHarvestBlock
+		- Added onSelfItemCraft
+		- Added onSelfItemRepaired
+		- Added onSelfPrimaryActionMiss
+
+	[ BlockSpawnCube2SDX ]
+		- Fixed an issue where ec= parameter was being improperly read
+
+	[ Buff Requirements ]
+		- Added new Buff Requirements
+			- <requirement name="RequirementBlockHasHarvestTags, SCore" tags="salvageHarvest" />
+				- True if the block you are harvesting has any Harvest Drop events with the tag of SalvageHarvest
+
+			- <requirement name="RequirementIsProgressionLocked, SCore" progression_name="attPerception" />
+				- True if attPerception is currently locked to the player.
+
+			- <requirement name="RequirementIsTargetBlock, SCore" tags="air"/>
+				- True if the target block is air.
+			- <requirement name="RequirementQuestObjective, SCore" objective="ObjectiveTreasureChest" />
+				- True if any quest is currently in <objective type="TreasureChest"
+
+	[ MinEvent Action Change Faction SDX ]
+		- Added clearing of the RevengeTarget
+
+	[ SphereII Learn By Doing ]
+		- Experimental modlet designed to bring back Learn by Doing without touching progressions.xml or items.xml.
+		- Don't use this unless you are intentionally and knowingly testing it.
+		
+
+
+
+Version: 2.1.4.1248
+
+	[ AIDirector Scout Chance ]
+        - Configurable Scout Spawns: We've introduced a new patch to the AIDirectorChunkEventComponent that allows for precise adjustment of the scout zombie spawn chance.
+        - Vanilla Behavior: In the base game, there is typically a 20% chance to spawn a scout when all other conditions for a spawn event are met.
+        - Previous Versions: In earlier versions of this mod, there was no percentage check; if all other conditions were valid, a scout would always spawn.
+
+        New Control: You can now customize this probability via the ScoutSpawnChance setting under AdvancedZombieFeatures.
+        ```xml
+        <property class="AdvancedZombieFeatures">
+            <!-- -1 disables this patch, reverting to default game behavior. -->
+            <!-- A value of 0.2 will result in a 20% chance to spawn. -->
+            <!-- A value of 1 will result in a 100% chance to spawn. -->
+            <property name="ScoutSpawnChance" value="-1" />
+        </property>
+        ```
+
+    [ ConfigurationFeatureBlock ]
+        - Added ScoutSpawnChance to AdvancedZombieFeatures
+        - Fixed typo in property for EnemyActiveMax setting.
+
+    [ NPCs ]
+        - Fixed an issue where NPCs would jump erratically, enthusastically, and without regard for public moral standards.
+        - Fixed an issue where the NPC's AK47 would shoot a few times, then stop.
+
+Version: 2.1.3.1505
+
+	[ Fire Manager ]
+		- Fixed an issue where fire sounds were heard by every player, regardless of proxmity of fire.
+		- Updated the logic on how each player hears to allow it to fade correctly.
+		- Modified the processing logic to ensure all blocks on fire will be processed accurately.
+		- Added a Fire Particple Optimizer that enables culling based on the size of the fire.
+			- A Small fire will have a particle on each block.
+			- A medium size fire will a particle on it, however, neighborly blocks will not.
+			- A larger size fire will further reduce the concentration of particles.
+
+Version: 2.1.2.1825
+
+	[ Audio Patch ]
+		- Fixed an issue with score running against 2.1
+
+	[ ItemActionLauncherSDX ]
+		- Fixed an issue where the NPC's with rocket launchers was not shooting past 1 or 2 rockets.
+
+	[ UAITaskAttackTargetEntitySDX ]
+		- Fixed an issue where the NPC's IsReloading() was being incorrectly checked. That functionality does not work on NPCs.
+
+	[ Particles On Blocks ]
+		- Fixed an issue where biomeProvider was null.
+
+	[ Documentation ]
+		- Restructed XPath and Conditionals documentation.
+
+	[ onSelfItemRepaired ]
+		- Added a Harmony patch to trigger the minevent effects on an item being repaired.
+			- Patched via the QuestManager's event.
+
+	[ MinEvent Action ]
+		- Added a new MinEventAction that handles modifying the quality of items.
+				<triggered_effect trigger="onSelfItemRepaired" action="ModifyItem, SCore" >
+		- Added new Requirement to check against the quality of an item.
+			<requirement name="CompareItemProperty, SCore" property="Quality" operation="Equals" value="1"/>
+
+		[ See More ](Features/ItemRepairDegradation/ReadMe.md)
+
+
+Version: 2.0.24.1245
+	[ Spawn Cube ]
+		- Cleaned up SpawnCube2SDX
+		- Added new BlockSpawnCubeRepeater, that will tick and spawn entities over time.
+	        <block name="DeamonPortal2">
+    	        <property name="Extends" value="DeamonPortal"/>
+        	    <property name="Class" value="SpawnCubeRepeater, SCore"/>
+	            <property name="Model" value="@:Entities/Vehicles/TraderVehicles/traderMountainBikeStaticPrefab.prefab"/>
+	            <property name="ModelOffset" value="0,0,0"/>
+	            <property name="MaxDamage" value="250"/>
+
+	            <property name="EntityGroup" value="ZombiesAll"/>
+	            <property name="SpawnRadius" value="5"/>
+	            <property name="SpawnArea" value="15"/>
+	            <!-- Spawn 2 each tick -->
+	            <property name="NumberToSpawn" value="2"/>
+	            <!-- Total number of ticksbefore the block self-destructs -->
+	            <property name="MaxSpawned" value="10"/>
+
+	            <!-- How many ticks between the spawn times-->
+	            <!-- NumberToSpawn spawns each time it block ticks. -->
+	            <property name="TickRate" value="10"/>
+	        </block>
+
+	[ Documentation ]
+		- Added new Examples documentation that shows examples on how to accomplish 0-SCore features.
+
+Version: 2.0.23.1213
+	[ EntityMoveHelper ]
+		- Removed old StartJump block based on BlockedTime, which caused NPCs not to jump.
+
+	[ MinEventActionChangeFactionSDX ]
+		- Added code to reset attack target, removing temporarily the aggro switch.
+
+	- Added documentation 
+		
+Version: 2.0.22.1718
+
+	[ Recipes ]
+		- Added support for generateing a MinEvenParams package, which allows more MinEvents to be used on the onSelfItemCrafted.
+		- These seem to only trigger when looking in a workstation and an item is creted.
+		- Now will respect requirements.
+		Examples:
+
+		<effect_group name="Sphere Testing">
+		    <triggered_effect trigger="onSelfItemCrafted" action="AddAdditionalOutput, SCore" item="resourceYuccaFibers" count="2"/>
+
+		    <triggered_effect trigger="onSelfItemCrafted" action="AddAdditionalOutput, SCore" item="ammoRocketHE" count="2">
+			    <requirement name="HasBuff" buff="god"/>
+		    </triggered_effect>
+
+		    <triggered_effect trigger="onSelfItemCrafted" action="PlaySound" sound="player#painsm">
+			    <requirement name="!HasBuff" buff="god"/>
+		    </triggered_effect>
+		    
+		    <triggered_effect trigger="onSelfItemCrafted" action="AddBuff" buff="buffDrugEyeKandy"/>
+
+	[ EntityAliveSDX ]
+		- Changed a walk type from 4 to 21 for crawler.
+
+Version: 2.0.21.1719
+	[ Fire Manager ]
+		- Fixed a Crash To Desktop ( CTD ) when adding fire particles off main thread.
+		- Added support for random fire particles, using "," as a delimiter.
+
+	[ Drop Box ]
+		- Fixed another 2 issues with Drop Box eating items when nearby storage was opened.
+
+	[ A Better Life ]
+		- Fixed entityclasse references for Fish
+
+	[ Recipes ]
+		- Added a new feature to trigger multiple outputs when crafting a recipe.
+		- Example: in addition to ammo45ACPCase, this will also produce grass fibres and duct tape.
+    <recipe name="ammo45ACPCase" count="30" craft_time="5" craft_area="MillingMachine" tags="workbenchCrafting,PerkHOHMachineGuns">
+        <ingredient name="resourceBrassIngot" count="5"/>
+        <effect_group name="Additional Output">
+			<triggered_effect trigger="onSelfItemCrafted" action="AddAdditionalOutput, SCore" item="resourceYuccaFibers" count="2"/>
+			<triggered_effect trigger="onSelfItemCrafted" action="AddAdditionalOutput, SCore" item="resourceDuctTape" count="1"/>
+		</effect_group>
+    </recipe>
+
+		- Note: The AddAdditionalOutput MinEvent is only usable by this recipes hook. It will do nothing in any other context.
+		
+Version: 2.0.20.1639
+	[ ItemAction Repair ]
+		- Fixed multiple null references when attempting to repair an item while the player was wearing it. 
+
+	[ Challenges ]
+		- Fixed an issue with the StartFire challenge when there was no fire manager.
+		- Fixed an issue with ExtinguishFire
+
+	[ Drop Box ]
+		- Fixed an issue where the DropBox was distributing items to containers that was opened by another player, and disappearing.
+
+	[ Trader Currency ]
+		- Fixed an issue where the currency wouldn't refresh.
+
+	[ ItemActionMelee ]
+		- Added two events for when a zombie misses its hit.
+			onSelfPrimaryActionEnd
+			onSelfPrimaryActionMissEntity
+
+
+Version: 2.0.19.1555
+	[ Blocks.xml ]
+		- Updated a reference to a vanilla block for a mesh
+
+	[ Shared Reading ]
+		- Fixed an issue where a connecting player would not share their reading with a player that is hosting.
+
+	[ Blooms Family Farm ]
+		- Added conditional for NPC farm to only be available if NPC Core is loaded.
+
+	[ Blood Moon Tweak ]
+		- Added new property to AdvancedZombieFeatures configuration block that allows you to increase the default enemy active during blood moons
+		- Previously, it was fixed to max out at 30.
+                <!-- Vanilla is default to 30. -1 disables this patch. -->
+                <propert name="EnemyActiveMax" value="-1" />
+
+	[ SCoreLocalization Helper ]
+		- Fixed a dumb implementation in a less dumb way.
+
+EnemyActiveMax
+
+Version: 2.0.17.1140
+	[ TileEntity IsAlwaysActive ]
+		- Fixed an issue where isAlwaysActive was blocking regular tile entities from showing they are Active.
+
+Version: 2.0.16.2016
+	[ Fire Manager ]
+		- Fixed an issue where Challenge Objectives related to Fire would null ref if used.
+
+Version: 2.0.15.1644
+	[ EntityAliveSDX , EntityNPCBandit ]
+		- Removed the Walk Type 8 filter from the Crouch after stun reset.
+		- Fixed an issue where the NPC wouldn't use the right/left hand as they were supposed too for the various weapons.
+
+Version: 2.0.14.1511
+	[ Block ]
+		- Updated block Model reference to support new format.
+
+	[ Fire Manager ]
+		- Cleaned up an error when game is exiting and fire manager is not enabled.
+
+	[ Trader Currency ]
+		- Added a check to see if the trader was already in the dictionary.
+		- Added a check to store the original currency, and use in place of casinoCoin
+
+	[ NPC Core ]
+		- Fixed an issue where NPCs would get stuck in a crouch after stun
+		- Updated code in EntityAliveSDX and EntityBanditSDX for GetEyeHeight() checks
+
+
+Version: 2.0.12.1509
+	[ Disable Trader Protection ]
+		- When DisableWallVolume is enabled, the invisible wall volumes will be removed.
+		- New property under AdvancedPrefabFeature to enable it:
+			<!-- Disables the invisible wall behind traders -->
+			<property name="DisableWallVolume" value="false" />
+
+	[ Fire Manager ]
+		- Fixed an issue where a POI reset would cause it to fill with extinguished smoke.
+		- Updated reference to the SCoreMedium loop for sounds.
+
+	[ Trader Currency ]
+		- Added the ability to change a particular trader's currency, using the alt_currency attribute.
+				<trader_info id="8" reset_interval="3" open_time="4:05" close_time="21:50" alt_currency="oldCash">
+		- When a player talks with a trader, with the alt_currency, it will update the backpack's currency display to use that value.
+
+	[ SphereII Peace of Mind ]
+		- Replaced a few new hanging corpses with empty pillar
+		- Fixed issue here zombiePartyGirlCharged was throwing warnings
+
+
+ Version: 2.0.11.824
+	[ Shared Reading ]
+		- Removed "Learned" from the Tooltip
+		- Added a new Localization method to try to always get a localized entry
+			- In some cases, there's no Localization directly from the key
+			- Example:  
+				craftingRifles
+				- In those cases, it'll check for craftingRiflesName, craftingRiflesDesc, and finally craftingRiflesLongDesc
+
+	[ SCoreLocalizationHelper ]
+		- Wrote a static helper class to cycle through various Localization attempts.
+		- This was added to make the sharedReading code a bit cleaner.
+
+Version: 2.0.10.1059 - PreRelease
+	[ Farming ]
+		- Converted RequireWater and WaterRange to be Auto properties, allowing them to be changed.
+
+	[ Shared Reading ]
+		- Fixed an issue where shared reading wasn't working properly on dedicated servers
+
+Version: 2.0.8.920 - Prerelease
+	
+	[ Blocks ]
+		- Added a new patch that allows blocking placing blocks without POI bounds.
+			- This does not affect repairing or upgrading.
+		- New Config block entry under AdvancedPrefabFeatures
+			<!-- Property to check if the prefab name has a no building flag on it. Goes by prefab name. -->
+			<!-- Comma delimited -->
+			<property name="PrefabName_NoBuilding" value="" />
+
+			<!-- Property to check if a Prefab has this tag on its XML. Comma delimited. -->
+			<property name="PrefabTag_NoBuilding" value="NoBuild" />
+
+		- A prefab that has any of these conditions will block placing any blocks within its bounds:
+			- If a Prefab has a Tags set to the PrefabTag_NoBuilding
+			- If a prefab has a Localized Name, or filename that patches PrefabName_NoBuilding.
+				- This is a contains() check, so be explicit unless you want to cover multiple POIs.
+
+	[ Shared Reading ]
+		- Fixed a null reference when a client was reading a book.
+		
+Version: 2.0.7.1008 - Prerelease
+	[ Replace Material ]
+		- Added a Debug log for ReplaceMaterial to print out the materials on the entity spawned.
+		- This will print a log entry if the Debug "Show Tasks" is enabled for showing EAI information.
+
+	[ Shared Reading ]
+		- Added new Feature under Advanced Player Feature for Shared Reading
+		- Default is False.
+		- Any item read with the property "Unlocks" will share the event with all online party members.
+		- If an item has the property "NoSharedReading", it will not share it with party members.
+		- New Localization.txt entries:
+			sharedReading,"Learned"
+			sharedReadingDesc,"Shared Reading from"
+			sharedReadingSourceDesc,"Sharing To Party Members"
+		- All Party members will see  "Shared Reading from sphereii : Learned <Unlocks Value>"
+		- The reader will see "Sharing to Party Members : Learned <Unlocks Value>"
+
+	[ Food Spoilage ]
+		- Fixed an issue where spoiled items would get spammed
+		- Fixed an issue where spoilage counter would be reset
+		- Fixed an issue where the durability bar would disappear.
+	
+	[ SCoreConstants ]
+		- Fixed typo in SCoreConstants
+
+Version: 2.x Initial
+	[ Migration ]
+		- Updated broken references. 
+		- Renamed changed parameters in blocks
+		- General refactoring.
+
+	[ EntityPlayerLocal ]
+		- Added SharedReading, defaulted to false the blocks.xml
+			- If enabled, all items with the property "Unlocks" is shared with party members.
+
+	[ EntityEnemySDX ]
+		- Uncommented Read and Write methods to allow patrol points to be used
+
+	[ Patches ]
+		- Added Patch for Dynamic Music, triggering a null reference if NPCs are within trader areas
+		- Added a patch to prevent null references if a loot list name isn't set for NPCs
+			- This triggered Null ref when trying to open up an NPC's death bag.
+
+	[ NPCs ] 
+		- Fixed an issue where EntityNPCBandit did not have any weapons in their hand.
+		- The dialog window has changed, and is missing a property we relied on for NPCs to speak.
+			- A new dialog window will have to be written in the future.
+			- Currently using the Subtitle dialog window for this.
+
+	[ Fire Manager V2 ]
+		- Major AI assisted refactoring to improve performance.
+		- Broke the class into several helper classes and cleaned up the code.
+		- New code is in FireV2. Old code is still there, but not included into the build.
+		- Added a check to see if there's sprinklers around to extinguish the fire.
+
+	[ Food Spoilage ]
+		- Major AI assisted refactoring code to improve performance.
+		- New code is in FoodSpoilageV2. Old code is still there, but not included into the build.
+
+	[ Config Blocks ]
+		- Exposed The BlockTimeToJump value to XML. 
+			- This determines how long an NPC should be blocked before allowing them to jump.
+		- Exposed the BlockedTime value to XML. 
+			- This determines how long an NPC should be blocked before considering they are blocked and need to do something else.
+
+	[ EntityAlive SDX ]
+		- Added new property to change the default window group being opened for dialog.
+            <property name="dialogWindow" value="dialog" />
+
+	[ SCore Constants ]
+		- Created a new class that can be used to centralize some variables to be used elsewhere.
+
+	[ Utility AI ]
+		- Adjusted all the block time checks to use the SCoreConstants class.
+		- Added NotHasHomePosition as an inverse check
+		- Added new TerritorialSDX task that wanders within the home range.
+		- Integrated https://github.com/SphereII/SphereII.Mods/issues/83
+                    // If the weight of this action is lower than the current high score, then even More actions
+                    // the highest consideration score of 1 can't make this the winning action.
+		
+
+		[ UAI Farming Task ]
+			- Modified Consideration HasHomePosition as a simple if its set or not.
+			- Re-factored UAIFarming Task to handle new piping, and restructuring.
+			- Fixed an issue where the farmer would get task locked
+			- Fixed an issue where the farmer would destroy random farm blocks.
+			- Modified the Bloom's Utility AI with new considerations and default tasks
+				- The default tasks will be used when NPC Core is not loaded
+			- Added Territorial to default, keeping the farmer close to the farm while still wandering about it.
+
+	[ Farming Systems ]
+		- Adjusted BlockWaterSourceSDX to better detect when water is available to the sprinkler
+		- Added the ability to interact with it to turn off individual sprinklers.
+		- Added the ability for water to extinguish nearby fires
+		- Added the ability for sprinklers to rescan when a pipe is removed or added.
+
+	[ Dialog ]
+		- Added patch to allow EntityAliveSDX to display dialog statements in the Subtitle window
+		- Added a patch to enable extends on dialogs, to inheirt and combine multiple dialogs.
+		- The extends is a comma delimited list of other dialogs to merge.
+        	<dialog id="FrankieFarmerDialog" startstatementid="start" extends="trader,GenericZombieLoreDialog">
+
+	[ Localization ]
+		- Added a patch to support <include for Localization files
+		- The <include could be added any place in the Localization.txt file.
+		- Each included localization file needs to have a header.
+			Key,english
+			<include filename="Dialogs/Farmer/Localization.txt"/>
+			<include filename="Dialogs/General/ZombiesDialog.txt"/>
+			<include filename="Dialogs/General/TraderSurvival.txt"/>
+	
+
+Version: 1.3.24.1230
+	[ NPCs ]
+		- Added support for the Auto-Stach buttons to work with NPCs.
+
+	[ AdvancedItemsFeatures ]
+		- Added a new property to the AdvancedItemsFeature in the blocks.xml
+	        <property name="DisableScrapFallback" value="false"/>
+		- This feature is only enabled AdvancedItemRepair is set to true.
+		- If this feature is enabled, but RepairItems / ScrapItems is not defined, then the item will scrap using vanilla.
+		- Current behaviour allows an item to be scrapped using a reduced recipe based on its ingredients, without defining RepairItems / ScrapItems.
+
+		- Added ScrapItems support for blocks.
+
+	[ Version Checker ]
+		- Received donated Code from Yakov that allows modders to add a versioncheck.xml file to their overhauls
+		- This versioncheck.xml file can be anywhere in the Mods folder
+		- This versioncheck.xml file contains the expected game version, along with optional messages to display.
+		- If this versioncheck.xml file is found in the Mods folder,
+			- Reads the current game version, and compares it to the expected game version.
+			- If the version matches, the main menu loads normally.
+			- If the version mismatches, a message box is shown to the players, saying the version does not match.
+			- The message box has a Quit and Continue button, allowing the user to keep going if they really want too.
+		- Example file can be found under Features/VersionCheck/versioncheck.example
+		- Added localization support.
+
+
+Version: 1.3.7.1037
+	[ Challenges ]
+		- Added multi-option to the loot_list= for the Gather Challenge. This is a comma-delimited list.
+	
+	[ Craft From Containers ]
+		- Added new Config option in Blocks.xml to check if a container is within Landclaim bounds, rather than distance.
+		    <set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='AdvancedRecipes']/property[@name='LandClaimContainersOnly']/@value">true</set>
+		- Default is false, do not restrict to landclaim, but rely on distance.
+
+		- Added new Config option in Blocks.xml to check if the player is within landclaim bounds.
+		    <set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='AdvancedRecipes']/property[@name='LandClaimPlayerOnly']/@value">true</set>
+		- Default is false, do not restrict player from being within a landclaim bounds.
+
+	[ Dynamic Bone ]
+		- Added test code for a new dynamic bone system.
+
+Version: 1.3.2.1535
+	- No Code changes. Rebuilt against Game Version 1.3.
+
+Version: 1.2.68.1007
+	[ Material Modifier ]
+		- With approval from Zilox, consumed the Material Modifier mod into 0-SCore to take over maintenance going forward.
+			<triggered_effect trigger="onSelfFirstSpawn" action="ReplaceMaterial, SCore" 
+				target_material_name="HD_Arlene_Radiated" replace_material="#@modfolder:Resources/ww_zeds_1.unity3d?HD_Arlene_Rad"/>
+	
+	[ Challenges ]
+		- Added an item_tags to the CraftWithIngredient Challenge to check the tag for an ingredient
+			<objective type="CraftWithIngredient, SCore" count="2" item_tags="tag"/>
+			- This can work with ingredient= as well, and mix and match.
+			- Tag is checked first, then ingredient name.
+			- If tag is found, then it counts towards the challenge, but does not again check the ingredient name.
+
+		- Added a PlaceBlockByTag objective that checks for block tag when a block is placed.
+			<objective type="BlockPlaceByTag, SCore" count="2" block_tags="myTag"/>
+
+		- Added a loot_list attribute to GatherTags. It varies that the loot container is opened, with the loot_list name, before counting.
+			- This will not be 100% accurate, as it counts the items you have, and not necessarily how many you are grabbing from the loot container itself
+	            <objective type="GatherTags, SCore" loot_list="garbage"  item_tags="junk" count="10"/>
+
+
+
+
+Version: 1.2.61.2007
+	[ Fire Manager ]
+		- Fixed a potential threading issue with fire particles.
+
+Version: 1.2.59.838
+	[ Fire Manager ]
+		- Fixed a net package setup that was causing bad performance
+		- Adjusted how the netpackages are sent to the clients and recieved by the clients
+		- Reduced the information distributed via net packages
+
+Version: 1.2.57.733
+	[ On Block Added ]
+		- Fixed a null reference in onBlockAdded patch when loading prefab editor.
+
+Version:1.2.56.900
+	[ NPCs ]
+		- Fixed a few issues with null references when adding NPCs to storage.
+		
+
+Version: 1.2.54.1354
+	[ NPCs ]
+		- Fixed an issue where NPCs could be quick stacked into Drop box and other storage units
+
+	[ Challenges ]
+		- Fixed an issue where Stealth Kills would trigger twice, resulting in credit of 2 for 1 kill.
+
+Version: 1.2.53.1812
+	[ Challenges ]
+		- Added in a missing block tag check on the BlockUpgrade challenge
+
+Version: 1.2.52.1518
+
+	[ Challenges ]
+		- Fixed various issues with counting killed entities towards challenges
+		- Refactored the SCore base class a bit to handle the bugs
+		- Stealth kills should be working as expected now.
+		- Decaptation challenges should be working better.
+		- KillWithItem challenges should be working better.
+		- Fixed issues where Fire-related challenges was not running for clients connecting to servers.
+
+	[ Goto POI SDX ]
+		- Fixed an issue where the POI's name was not being localized.
+
+	[ Requirements ]
+		- Fixed an issue with the IsBloodMoon requirement check
+
+	[ Auto Redeem Challenges ]
+		- Fixed a potential null reference.
+			- Probably just a timing issue, but better safe then sorry.
+
+	[ UAI ]
+		- Applied fixes to the UAI Farming Task
+			- Changed how the Entity determines its looking at the target plot
+			- Changed the distance check kto determine if its close enough to the target plot.
+
+	[ Fire Manager ]
+		- Changed FireManager from a polling method to a Monobehaviour, attached to the GameManager's transform.
+			- This should reduce it spinning on Updates every frame.
+		- Fixed a few issues with netpackages, and distributions. Maybe.
+		- Refactored a few calls to make them easier to call from other scripts.
+		- Added in a new property, called "FirePersists". 
+			- If this is set to true, fire will be saved.
+			- Default is not saved when the game is unloaded / loaded.
+
+		- Added new patch to OnBlockAdded to check for property to start a block on fire.
+		- When this property is on a block, and is set to true, it'll automatically catch fire.
+			<property name="RegisterToFireManager" value="true" />
+
+		- Changed how a block picks its Fire Particle.
+		- A Fire Particle can be defined on a block's material, a block, or in the global block configuration, using this syntax:
+			<property name="FireParticle" value="@modfolder:..." />
+
+		- Fire particle that will be used on any given block will now be determined by in this order of priority: 
+			- A block's material
+			- A block
+			- Default fire particle defined in global block configuration.
+				- If Random Fire Particle is set to true, a random fire particle will be used instead of the global block configuration.
+			
+
+
+Version: 1.2.37.1146
+	[ NPCs ]
+		- Reverted a patch that was causing null ref on player death.
+		- This patch was meant to block people stashing NPCs.
+
+Version: 1.2.36.1142
+	[ NPCs ]
+		- Fixed an issue where a null reference would happen in a harmony patch for the Stash All.
+
+	[ Cave Spawning ]
+		- Fixed an issue where cave spawning was too sensitive.
+
+Version: 1.2.35.852
+	[ NPCs ]
+		- Fixed an issue where NPCs could be added to a storage box using the Stash All button.
+
+	[ Path Finding ]
+		- Accidentally reverted the sign for path finding.
+		- Intentionally restored the change.
+
+	[ Entity Factory Patch ]
+		- Added a patch to EntityFactory to catch "GetEntityType slow lookup for" for SCore-related classes
+
+
+Version: 1.2.29.952
+	[ Fire Mod ]
+		- Additional performance fixes when playing on servers
+
+	[ Caves ]
+		- Fixed issues with decorations being too few
+		- Cleaned up old staglamites which do not exist anymore
+		- Fixed cave spawning issues, and refactored the class
+
+	[ EntityAliveSDX ]
+		- Changed the default name of Bob to empty string.
+
+	[ Error Handling ]
+		- Added a ConfigBlock entry for a null reference in BlockEntityData.GetRenderers()
+			- This error would be thrown sometimes when a POI was being reset
+			- This feature must be set to true to guard against the null check. Default is false.
+				<property name="BlockEntityDataGetRenderers" value="true" />
+
+
+Version: 1.2.8.1136
+	[ NPCs ]
+		- Fixed an issue where NPCs could be added to Drone
+
+Version: 1.2.4.1601
+	[ Block Triggered SDX ]
+		- Fixed an issue with the ActivateOnLook check
+
+Version: 1.2.2.2032
+	- Updated Cave Spawning to fix against 1.2
+	- Updated other broken code from the 1.2... minor adjustments
+
+	[ Lock Pick ]
+		- Added a null check on entityalive before checking if they have a cvar.
+
+	[ Challenges ]
+		- Fixed a grammar issue in a comment
+
+Version: 1.1.62.918
+	[ Repair Counter ]
+		- Added a new Harmony patch to monitor how often an item can be repaired, before blocking the repair.
+		- This only works on Items, repaired through ItemActionEntryRepair.
+		- Two formats are supported:
+			- Comma delimited value. This will allow you to adjust max repairs based on quality
+			- For non-quality items, or to simplify, a single value can be used for all teirs.
+	 		
+  				<append xpath="/items/item[@name='meleeToolRepairT0StoneAxe']">
+					<!-- The first value is quality 1. The last value is quality 6 -->
+  					<property name="RepairLimit" value="1,2,3,4,5,6" />
+  				</append>
+
+				<append xpath="/items/item[@name='meleeToolRepairT0TazasStoneAxe']">
+					<property name="RepairLimit" value="5" />
+				</append>
+		- Localization Key is: repair_limit_reached
+
+	[ Block Spawn Cube 2SDX ]
+		- Adjusted the code again to try to spawn just a single entity.
+
+Version: 1.1.54.933
+	[ Fire Manager ]
+		- Fixed the laws of physics or whatever laws there are that govern how fire spreads.
+		- Fire now spreads.
+
+Version: 1.1.53.1237
+
+	[ Fire Manager ]
+		- Functionality should be the same, but performance should be increased quite a bit.
+		- Added Smoke Time to be on its own timer
+		- Changed the main check loop to only process 1 block per frame
+		- Changed blocks that are destroyed or extinguished so they are collected as in a list.
+			- At the end of the Check Update, a single netpackage is sent with all the changes.
+			- Previously, a net package was sent for each block in the loop.
+		- Rather than playing sounds at the location of fire, another check is done every second to see if any player is near fire,
+			- If a player is near fire, it'll play the defined FireSound in the player's head.
+			- This was the biggest source of improvement.
+
+	[ SpawnCube2SDX ]
+		- Modified the OnBlockAdded to only add a Tick event if there's more than 1 entity to spawn.
+
+Version: 1.1.49.1701
+	[ SpawnCube2SDX ]
+		- Added an additional check to see if an entity has already spawned, and blocks further spawns.
+
+	[ Challenges ]
+		- Fixed an issue with Craft With Ingredient, where an item had no recipe, causing a null reference.
+
+	[ EntityAliveSDX ]
+		- Removed a debug log about Weapon not found, but was actually there.
+
+	[ Take And Replace ]
+		- Added a new property that will trigger the drop event Harvest.
+       		<property name="HarvestOnPickUp" value="true" />
+		- If this property is set to true, the following drop event style will be triggered:
+            <drop event="Harvest" name="resourceCrushedSand" count="9" tag="oreWoodHarvest"/>
+            <drop event="Harvest" name="resourceClayLump" count="9" tag="oreWoodHarvest"/>
+		- The block itself will only do the harvest; it will not give you the PickUpValue back.
+		- By default, Harvest On pick up is false.
+
+Version: 1.1.42.847
+	[ ConfigurationBlock ]
+		- Added new section called "AdvancedQuests" to allow more control over quests.
+
+	[ Fire Manager ]
+		- Added a null check for the NetPackage for AddFirePosition
+		- Removed extra checks that may have been block fire from being cleared on quest reset
+
+	[ GotoPOISDX ]
+		- Added new Property block in ConfigurationBlock called AdvancedQuests
+		- New Property value in AdvancedQuests block in ConfigurationBlock for re-using quest locations
+		- If "ReusePOILocations" is set to true, it will not filter quest locations based on if they were already visited.
+
+	[ SpawnCube2SDX ]
+		- Added potential fix for duplicate spawns.
+
+Version: 1.1.36.1627
+	[ Client Kill Event ]
+		- Changed ClientKill() patch to be a Prefix vs Postfix to fix an issue where it'd fire multiple times
+			- ie, chopping up a dead body would count as a kill for each hit.
+
+	[ Fire Manager ]
+		- Fixed an issue where a molotov would not trigger the OnStartFire
+		- This caused a molotov not to trigger the Start A Fire Challenge
+		- Fixed an issue with the NetPackage for calling AddBlock instead of Add(), skipping player assigning
+			- Fixes an issue with the challenge Fire Started on dedicated servers.
+
+	[ Remote Crafting ]
+		- Added an additional property to AdvancedRecipes for Checking if Enemy is nearby
+		- BlockOnNearbyEnemies is now available in both BlockUpgradeRepair and AdvancedRecipes.
+				<property name="BlockOnNearbyEnemies" value="false"/>
+		- Previously, this toggle was defined in BlockUpgradeRepair only, but used to block crafting as well.
+
+	[ Error Handling ]
+		- Default is false, these errors are NOT handled. Change to true to use them, under ErrorHandling.
+
+		- Added a ConfigBlock entry for a null reference in TraderData.ReadInventoryData()
+			- This error would be thrown sometimes when a POI was being reset, and a workstation / vending machine
+			went from working / non-working. 
+			<property name="TraderDataReadInventory" value="false" />
+
+		- Added a ConfigBlock entry for TileEntity.CopyFrom()
+			- This error could occur during POI resets. Base class for CopyFrom throws an exception. This blocks it.
+				<property name="TileEntityCopyFrom" value="false" />
+			- When set to true, it will also log an entry in the log file saying which block its causing on.
+			- It may be a sign the block is not configured correctly.
+                Debug.Log($"ErrorHandling::TileEntityCopyFrom::Prefix:: {_other.blockValue.Block.GetBlockName()}. No Defined CopyFrom()");
+
+
+Version: 1.1.28.1028
+	[ Farming ]
+		- Added "MuteSound" to the BlockWaterSourceSDX to turn off sprinkler sound.
+			<property name="MuteSound" value="true" />
+		- Default is false, the sound is not muted.
+
+		- Added GetWaterRange(), RequireWater(), and WillWilt() public methods as part of the BlockPlantGrowingSDX
+			- No functionality change, just makes it easier for others to read values through code.
+
+Version: 1.1.22.1530
+	[ Challenges ]
+		- Added a description_override attribute to completely over-ride the Localization key to the following Challenges:
+		- if description_override= does not exist, a generated Localized entry will be used.
+			- ChallengeObjectiveBlockDestroyed
+			- ChallengeObjectiveBlockUpgrade
+			- ChallengeObjectiveCompleteQuestStealth
+			- ChallengeObjectiveCraftWithIngredients
+			- ChallengeObjectiveCraftWithTags
+			- ChallengeObjectiveCVar
+			- ChallengeObjectiveDecapitation
+			- ChallengeObjectiveEnterPOI
+			- ChallengeObjectiveGatherTags
+			- ChallengeObjectiveKillWithItem
+			- ChallengeObjectiveStealthKillStreak
+
+	[ Events ]
+		- Fixed an issue with OnBuffAdded not parsing multiple buffs
+		- Removed Debug Log
+	
+
+Version: 1.1.21.1123
+	[ Challenges ]
+		- Fixed an issue where Block Upgrade did not do properly localization
+		- Fixed an issue where the WearTags was not working properly on mods
+
+		- Added a description_override attribute to completely over-ride the Localization key to the following Challenges:
+		- if description_override= does not exist, a generated Localized entry will be used.
+			- ChallengeObjectiveHarvest
+			- ChallengeObjectiveWearTags
+			- ChallengeObjectiveCraftWithTags
+			- ChallengeObjectiveCraftWithIngredient
+
+Version: 1.1.20.1108
+
+	[ Challenges ]
+		- Expanded support for WearTags Objective to support installable_tags and modifier_tags.
+             <objective type="WearTags,SCore" item_tags="armorHead"/>
+             <objective type="WearTags,SCore" item_mod="modGunBarrelExtender"/>
+             <objective type="WearTags,SCore" installable_tags="turretRanged"/>
+             <objective type="WearTags,SCore" modifier_tags="modGunBarrelExtender"/>
+
+Version: 1.1.18.1635
+
+	[ Documentation ]
+		- Added some Documentation on Challenges and MinEvents
+
+	[ OnBuffAdded Event ]
+		- Added a if buff is null to the OnBuffAdded event, silently failing if the requested buff does not exist.
+
+	[ ObjectiveBuffSDX Quest Objective ]
+		- Added a if buff is null check, silently failing if the requested buff does not exist.
+
+	[ Min Events ]
+		- Found a few MinEvents that were combined in a single file.
+		- Seperated so that each MinEvent is in its own file.
+		- No changes necessary. This is just a clean up.
+
+	[ Challenges ]
+		- WearTags : Takes an item_tags, rather than an Item name.
+			- Also searches for the tag in Mod / Cosmectic slots.
+
+			Default Localization Key: challengeObjectiveWearTags
+            <objective type="WearTags,SCore" item_tags="armorHead"/>
+
+		- GatherTags : Takes an item_tags instead.
+			Default Localization Key: challengeObjectiveGatherTags
+            <objective type="GatherTags, SCore" item_tags="junk" count="10"/>
+
+		- Craft With Tags
+			Default Localization Key: challengeObjectiveCraftWithTags
+			<objective type="CraftWithTags, SCore" count="2" item_tags="tag01"/>
+
+		- Get CVar
+			Default Localization Key: challengeObjectiveOnCVar
+			<objective type="CVar, SCore" cvar="myCVar" count="20" description_key="onCVar" />
+
+	[ Nexus Release ]
+		- Fixed an issue where the zip files were not in the correct format for Vortex.
+ 
+	[ Block Ground Patch ]
+		- There is a bug with the PathingCubes and quickly moving into their chunk while being loaded.
+		- Throws a Block.GroundAlign null error because there is no ebcd (yet?)
+			NullReferenceException
+				at (wrapper managed-to-native) UnityEngine.Component.get_gameObject(UnityEngine.Component)
+				at Block.GroundAlign (BlockEntityData _data) [0x0001f] in <e8e43063270440388d2e6b7642da1a62>:0
+				at ChunkManager.GroundAlignFrameUpdate () [0x00028] in <e8e43063270440388d2e6b7642da1a62>:0
+				at GameManager.gmUpdate () [0x00393] in <e8e43063270440388d2e6b7642da1a62>:0
+				at GameManager.Update () [0x00000] in <e8e43063270440388d2e6b7642da1a62>:0
+
+Version: 1.1.10.1307
+	[ Food Spoilage ]
+		- Fixed an issue when using PreserveBonus -99, where a full stack would instant spoil.
+
+Version: 1.1.9.2008
+	[ Faction Manager ]
+		- Added a Harmony Patch to GetFactionByName() to catch for invalid factions.
+		- If a faction is requested from an entityclass, but it's not defined in npc.xml,
+			the undead faction is used.
+		- A message in the console is printed when a faction was not found.
+
+	[ POI Error Check ]
+		- Added in two Harmony patches, gated by two new blocks.xml entry.
+		- Under the ErrorHandling section:
+				EnablePoolBlockEntityTransformCheck
+				LogPoolBlockEntityTransformCheck
+		- Some POis were throwing errors about block entity's without a proper transform:
+			BlockEntity {0} at pos {1} null transform!
+			2: {0} on pos {1} with empty transform/gameobject!
+		- These were being thrown in the Chunk class.
+		- These two patches block that error from being thrown, and silently returns.
+		- The LogPoolBlockEntityTransformCheck will throw an error, but it'll tell you which block it's failing at.
+		- Both these should be false, unless you are specifically having a problem
+			
+	[ TileEntitySign Gif ]
+		- Fixed an issue where some older signs did not have the correct amount of transforms
+		- ie, pathing cubes
+
+	[ Challenges ]
+		- Fixed an issue with the StartAFire / Extinguish Fire where any entity would contribute
+
+	[ Fire Manager ]
+		- Updated the Fire Manager's StartFire / ExtinguishFire event takes an entity ID.
+
+Version: 1.1.4.1542  
+	[ Entity Targetting ]
+		- Updated the code for the ItemItemAction to first check if it's hitting an EntityAlive
+		- Then checks if the entity alive is dead. If so, let the damage through.
+		- If it's an EntityAlive, and it's alive, do the faction checks.
+
+Version: 1.1.4.1015
+	[ SCore Options ]
+		- Hide SCore Options window when in prefab editor
+
+	[ ConfigBlock ]
+		- Pathing cube reverted to 1,1,1 multidim.
+
+	[ Challenges ]
+		- Fixed a typo in the comment section of StealthKill showing an example.
+
+	[ EntityAliveSDX ]
+		- Changed the requirements for when to check if an EntityAliveSDX is near a campfire.
+		- Moved UpdateBlockStatusEffect from EntityAliveSDX to EntityUtilities
+
+	[ Entity Alive Patch ]
+		- Added a patch to EntityAlive's OnUpdateLive()
+		- If an entity has this cvar "UpdateBlockStatusEffect" with a value of non-0, then it will process the BlockStatus Effect
+		- This means it'll pick up buffs and effects from blocks like BlockAoE.
+
+	[ One Block Crouch ]
+		- Exposed the crouch height modifier to xml, with the default being still 0.49 in code, and through xml.
+		- Any numbers below 0.10 will be set to 0.10.
+		- No max threshold is protected.
+		- This is adjusted in the AdvancedPlayerFeatures's section of the Config Block called PhysicsCrouchHeightModifier
+		    <set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='AdvancedPlayerFeatures']/property[@name='PhysicsCrouchHeightModifier']/@value">0.45</set>
+
+	[ Merged in Raycast change from khzmusik ]
+		From Commit Notes: 
+		- Disable ray hit events when entities can't be damaged
+		- This is a Harmony patch on `ItemActionDynamic.hitTarget` to disable the firing of "on[SelfPrimary|Secondary]Action[Ray|Graze]Hit" events 
+			if the holding entity can't damage the target entity.
+
+		- This is the cause of the stun baton "shock" issue with friendly NPCs. The stun baton itself wasn't hitting or doing damage, but the 
+			baton was still charging, and when fully charged, it still shocked the friendly NPC.
+
+		- I also refactored the logic to determine when an entity should use faction targeting. It was already repeated in two 
+			places in the code, and I would need to repeat it a third time in my patch.
+		- I did test to make sure that there were no regressions. I tested with a friendly NPC (Baker), and enemy NPC (Harley), and animal (bear), 
+			and zombies (mainly Boe). I made sure that I could still shock everyone except the Baker, and that when they attacked each other, they did damage.
+
+Version: 1.0.94.1336
+	[ Challenges ]
+		- Created an Interface for challenges to help future development work
+
+	[ Entity Alive Ground Detection ]
+		- Added a patch to stop a vanilla custom trader that was stuck in a fall post.
+			- Fix is to add vanillatrader tag to the trader
+
+	[ Maintenance ]
+		- Cleaned up some code that was never used, that was failing on 1.1.
+
+Version: 1.0.93.1757
+	[ Challenges ]
+		- Fixed an issue with Decapitation challenge
+		- Fixed an issue with the BlockUpgrade challenge
+
+Version: 1.0.93.1534
+	[ Challenges ]
+		- Added another patch to protect against potential errors when loading saves
+	
+	- KillWithItem:
+		- Changed main localization entry to challengeKillWithItemDesc
+
+	[ Caves ]
+		- Initial add for new cave system based on a texture2D.
+		- GenerationType is "Texture2D" to activate and test. 
+		- Sample Cave03.png is provided.
+		- Red Spots are POIs
+		- No support yet to control depth.
+
+Version: 1.0.89.1020
+	[ Challenges ]
+		- Added BlockUpgradeSCore, SCore
+			- Adds the ability to specify a block_tag/block_tags attribute.
+			- Adds the ability to filter based on biome.
+			
+		 	<objective type="BlockUpgradeSCore,SCore" block="frameShapes:VariantHelper" count="10" 
+				held="meleeToolRepairT0StoneAxe" needed_resource="resourceWood" needed_resource_count="8" />
+			<objective type="BlockUpgradeSCore,SCore" block_tags="wood" count="10" 
+				held="meleeToolRepairT0StoneAxe" needed_resource="resourceWood" needed_resource_count="8" />
+			<objective type="BlockUpgradeSCore,SCore" block_tags="wood" count="10" biome="burnt_forest" />
+
+Version: 1.0.88.1030
+	[ Challenges ]
+		- Added target_name_key parsing to KillWithItem.
+		- Added Localization key for KillWith Item
+			challengeKillZombiesWithItemDesc
+
+		- Added Item_tags to be validated, on the Harvest Objective.
+			- If item="" and item_tags="" are both defined, they both need to pass 
+			
+	[ NPCs ]
+		- merged 2 fixes from  khzmusik 
+			- Fixed a see cache issue
+			- Fixed a faction tracking issue
+
+Version: 1.0.86.1506
+	[ Challenges ]
+		- Another patch to fix challenges being corrupted
+
+Version: 1.0.86.1304
+	[ Challenges ]
+		- Fixed an issue where the Challenges were getting corrupted by conflicting enum values
+		- This probably needs a new Save to work.
+		- Added a new ObjectiveSCoreBase to allow us to make more challenges without duplicating a bunch of repeated tags.
+
+		- Added a new Challenge that fires whenever an NPC is being hired.
+			<objective type="HireNPC, SCore" count="20" />
+    	    <objective type="HireNPC, SCore" count="5" target_name="npcNurseKnife"/>
+        	<objective type="HireNPC, SCore" count="5" entity_tags="female"/>
+        	<objective type="HireNPC, SCore" count="5" entity_tags="male"/>
+        	<objective type="HireNPC, SCore" count="5" entity_tags="male" biome="burnt_forest"/>
+        	<objective type="HireNPC, SCore" count="5" entity_tags="female" item="resourceCropGoldenrodPlant"/>
+        	<objective type="HireNPC, SCore" count="5" entity_tags="male" item_tags="brass"/>
+        	<objective type="HireNPC, SCore" count="5" entity_tags="male" item_material="Mwood"/>
+
+		- Added a new challenge to give more control over harvest
+     		<objective type="Harvest, SCore" count="20" item="resourceWood" held_tags="axe" biome="burnt_forest" />
+			<objective type="Harvest, SCore" count="20" item="resourceWood" held_tags="axe" block_tag="challenge_pallet" />
+
+Version: 1.0.83.950
+	[ Events ]
+		- Fixed a null reference with the OnClientKill when the game would trigger the event after the game killed.
+
+	[ Challenges ]
+		- Added an optional cvar attribute for StealthKillStreak.
+		- This cvar will hold the longest recorded kill streak.
+			<objective type="StealthStreak, SCore" count="2" cvar="longestStreakCVar" />
+
+	[ SCore Utilities ]
+		- Created a window group for the SCore Utilities button
+		- Added it to the xui.xml, rather than the existing in game-menu
+		- Removed the background and cleaned up the SCore Utilities creen.
+
+Version: 1.0.82.935
+
+	[ Fire Mod ]
+		- Added Events:
+			- OnExtinguish - Triggered when a fire is extinguished
+			- OnFireUpdate - Triggered when a CheckBlocks on the fire mod finishes
+			- OnStartFire - Triggered when a new block is put on fire.
+
+	[ Challenges ]
+		- Fixed a null reference with the KillWith
+		- Fixed up LocalizationKey entry for some Challenge Objectives
+
+		- Decapitation
+			- New challenge to keep track of decapitations. Supports xml attributes from KillWithItem
+	            <objective type="Decapitation, SCore" count="10" item_tag="gun"  />
+            	<objective type="Decapitation, SCore" count="10" item_tag="knife,machete"  />
+
+		- Craft With Ingredient
+			- New challenge objective to allow a player to craft with a certain ingredient, rather than a recipe itself.
+				<objective type="CraftWithIngredient, SCore" count="2" ingredient="resourceLegendaryParts"/>
+
+		- Burn Down a Building
+			- New challenge to reward a player for burning down a house using the fire mod.
+	            <objective type="BlockDestroyedByFire, SCore" count="20" />
+
+		- Start a Fire
+			- New challenge to reward a player for starting a fire.
+	            <objective type="StartFire, SCore" count="20" />
+
+		- Out of Control Fire
+			- New challenge to reward a player for having a large fire
+	            <objective type="BigFire, SCore" count="20" />
+
+		- Extinguish Fire
+			- New challenge to reward a player for extinguishing some blocks.
+	            <objective type="ExtinguishFire, SCore" count="20" />
+			- World's more boring challenge for a pyro
+
+		- Break a block or a material on a block, and further define if it's in a certain biome and/or poi / poi_tag.
+			<objective type="BlockDestroyed, SCore" count="20" block="cntRetroFridgeVer1Closed" />
+			<objective type="BlockDestroyed, SCore" count="20" block="cntRetroFridgeVer1Closed" biome="burn_forest"  />
+			<objective type="BlockDestroyed, SCore" count="20" block="cntRetroFridgeVer1Closed" biome="burn_forest" poi="traderJen" />
+     		<objective type="BlockDestroyed, SCore" count="20" material="Mmetal" biome="pine_forest" poi_tags="wilderness" />
+
+		- Updated SphereII Challenges with examples. 
+
+Version: 1.0.81.1118
+
+	[ SCore Events ]
+		- Added two new events:
+		- OnRallyPointActivated
+			- When a Rally Point is activated, this event is called
+		- OnClientKill
+			- When an entity gets killed, this event is called.
+			- This event differs from the vanilla's Kill event, as it includes the DamageResponse.
+				- Vanilla event fires too early to have the Damage Response included in it.
+
+	[ Project ]
+		- Added new SphereII Challenges project.
+		- This includes a full page of Challenges that involve the new SCore events and new Challenge Objectives
+
+	[ Process Options ]
+		- Fixed an issue where the graphic settings were not running
+		- Added a check for the blocks.xml for some settings, before reading the cvar.
+	
+	[ Lock Picking ]
+		- Added a buff check to see if the Jail Breaking buff was active
+			- If active, break time is drastically increased, as well as the max angle to turn.
+		- Feel a bit limited on how to further cheese a skilled based game on candy.
+
+	[ Remote Crafting / Repair ]
+		- Added a tool tip to display if there's an enemy nearby, blocking you from pulling
+		- Fixed an issue where you could not repair even from your backpack, when enemies were near.
+
+	[ Challenges ]
+  	
+		-CompleteQuestStealth, SCore
+			A new challenge objective to monitor your stealth kills during a quest.
+			To pass this challenge, you must do consecutive stealth kills until you've reached the desired count.
+			If the stealth kill chain is broken, the Challenge is reset.
+
+			If the intention is that the full quest be done 100% stealth, set the count to be higher than the expected number of zombies
+			Once the Sleeper volumes are all cleared for the QuestObjectiveClear, then the challenge will complete, regardless if
+			the Count is equaled to the count specified.
+
+			Examples:
+				<!-- Kill two entities in a row with a stealth kill, during a quest. -->
+				<objective type="CompleteQuestStealth, SCore" count="2"/>
+
+				<!-- Kill all entities in a row with a stealth kill, during a quest. -->
+				<objective type="CompleteQuestStealth, SCore" count="1000"/>
+
+		-KillWithItem, SCore
+
+			To pass this challenge, you must killed zombies with the specified item. This extends the KillByTag objective, and thus supports
+			all those attributes as well. Multiple item="" can be listed as a comma-delimited list.
+
+			<!-- Kill two zombies in a row with a gunHandgunT1Pistol -->
+			<objective type="KillWithItem, SCore" count="2" item="gunHandgunT1Pistol" />
+
+			Rather than item name itself, you could also use item_tag
+			<objective type="KillWithItem, SCore" count="2" item_tags="handgunSkill"  />
+
+			ItemName is checked first, then item tags. If either passes, then vanilla code is checked for the other tags and checks.
+			You may also add the option entity tags and target_name_key for localization.
+
+			By default, the entity_tags and target_name_key is zombie and xuiZombies, respectively. These can be over-ridden via xml.
+
+			<objective type="KillWithItem, SCore" count="2" item="gunHandgunT1Pistol" entity_tags="zombie" target_name_key="xuiZombies" />
+
+			Other attributes available are:
+				target_name="zombieMarlene"
+				biome="snow"
+				killer_has_bufftag="buff_tags"
+				killed_has_bufftag="buff_tags"
+				is_twitch_spawn="true/false"
+
+			Note About Traps: 
+			If the item is a trap, such as a landmine, then the owner ID is not set on it. There is no way to track down, or give exp to a player
+			for the kill. I did add a check for this, so that you can use a landmine for a challenge. 
+
+			If a zombie dies from a trap, and the player is within 50 blocks, it will count towards the challenge.
+
+		- StealthStreak Challenge 
+			A new challenge objective to monitor your stealth kills
+			To pass this challenge, you must do consecutive stealth kills until you've reached the desired count.
+
+			If a kill is registered, and is not a sneak kill, then the challenge resets.
+		
+			<!-- Kill two entities in a row with a stealth kill -->
+			<objective type="StealthStreak, SCore" count="2"/>
+
+			This challenge extends from KillWithItem, and supports all those tags as well.
+
+Version: 1.0.75.721
+	[ Farming ]
+		- Fixed a null reference error when world is null / not ready.
+
+Version: 1.0.72.659
+	[ Process Options ]
+		- Added additional checks again a player being null or being on dedi.
+
+Version: 1.0.71.2148
+	[ Remote Crafting / Repair ]
+		- Fixed an issue where 2x the amount of resources was available. Display only bug.
+		- Removed debug lines.
+
+Version: 1.0.70.1352
+	[ Remote Crafting / Repair ]
+		- Fixed an issue where ItemActionEntryRepair wasn't detecting ingredients from an open container.
+		- Added checks for IsUserAccessing to check if the current user has a chest open, allowing them to pull resources from that container.
+
+	[ CanSway ]
+		- Fixed a null reference when exiting a game.
+
+Version: 1.0.65.1554
+
+	[ No Changes to SCore, only Better Life ]
+
+	[ SphereII A Better Life ]
+		- 1.0.19.1554
+		- Fixed an issue where errors would occur without NPC Core installed, due to factions.
+
+
+Version: 1.0.64.2041
+		[ SCore Options ]
+			- Added toggle for WeaponSway
+			- Added Toggle for gfx st set 0
+				- Game needs to be restarted after checked.
+				- Every start after will have that automatically running.
+			- Added Toggle for gfx pp enable 0
+				- Game needs to be restarted after checked.
+				- Every start after will have that automatically running.
+
+		[ Weapon Sway ]
+			- Added patches to vp_Weapon / vp_Camera to block swaying and bob code from running.
+			- This feature is configured via a cvar called "$WeaponSway". 
+				- Value of 0 will enable sway.
+				- Value of 1 or more will disable sway.
+			- This is included into 0-SCore, and as a standalone mod.
+				- The standalone mod disables it completely, with no option to toggle it back on.
+			- This feature can be toggled using the SCore Utilities, or through a console command
+			- Added new console Command weaponsway
+				- "weaponsway true" will turn on weapon and camera sway.
+				- "weaponsway false" will turn off weapon and camera sway.
+
+		[ Zombie Random Walk Type ]
+			- Removed default Spider / Crawler walk types
+			- Spider's head position look wonky, and crawlers were too slow.
+			
+
+		[ A Better Life ]
+			- Added notrample tag on fish
+			- Merged in new plants from blue name.
+
+Version: 1.0.60.1241
+		[ MinEvent ]
+			- Added a new MinEvent to allow changing local transform / rotation on a particular transform on an entity.
+				<triggered_effect trigger="onSelfBuffUpdate"
+					action="AdjustTransformValues, SCore"  
+					parent_transform="AK47"
+					local_offset="-0.05607828,0.07183618,-0.02150292"
+					local_rotation="-3.98,-9.826,-5.901"
+					<!-- Optional. Defaults to false -->
+					debug="true"  
+				/>
+
+		[ Console Command ]
+			- Added a new console command to assist testing of the above MinEvent. 
+			- Use this cautiously. 
+			- Example:
+				ReloadSCore buffs
+				ReloadSCore entityclasses
+			
+		[ Particles On Block ]
+			- Fixed a few issues where particles were being loaded incorrectly, causing a hard crash
+			- Added a patch on the init to pre-load Particles
+			- Added a check for to keep a particle upon removal of its block
+				<property name="PeristAfterRemove" value="false" />
+
+			- Somewhat realistic example:
+		    <append xpath="/blocks/block[contains(@name,'emberPile')]">
+        		<property class="Particles" >
+            		<property name="OnSpawnParticle" value="#@modfolder(0-SCore_sphereii):Resources/gupFireParticles.unity3d?gupBeavis02-CampFire,#@modfolder(0-SCore_sphereii):Resources/gupFireParticles.unity3d?gupBeavis03-Cartoon,#@modfolder(0-SCore_sphereii):Resources/gupFireParticles.unity3d?gupBeavis04-SlowFire,#@modfolder(0-SCore_sphereii):Resources/gupFireParticles.unity3d?gupBeavis06-HeavyLight"/>
+            		<property name="OnSpawnProb" value="0.1"/>
+					<property name="PeristAfterRemove" value="false" />
+        		</property>
+    		</append>
+
+
+Version: 1.0.59.1007
+		[ Food Spoilage ]
+			- Added missing FreshnessOnly check on the ModifyCVar minevent patch.
+			- The FreshnessOnly patch to execute if the item has the "FreshnessBonus" property on the item, and it's set to true.
+
+
+Version: 1.0.58.1256
+	[ Resharpen ]
+		- Fixed an issue where I confused UseTimes with Quantity.
+		- When you sharpen an item, it'll remove a random amount from the UseTime, capped at 20% of the total max usages
+		- Added 2 no location entries to be over-ridden in Localization.txt
+			TooDamagedToSharpen,"This item is too worn out to be resharpened.",""
+			NotDamagedEnoughToSharpen,"This item is still in pretty good shape.",""
+		- Cleaned up the code to make it seem like it wasn't developed by a drug addled raccoon.
+		- If you have used the item 70 times, with a max usage of 250
+			- A Random number between 51 and 70 is generated.
+			- 51 comes from 250 max usage * 0.2.
+			- At most, the Use times will be reduced to 51, with a possible minimum of 69.
+
+	[ Powered Workstation ]
+		- Added a check to see if fuel slots were null before checking if anything was in them.
+
+	[ EntityVehicle ]
+		- Added Harmony patch to EntityVehicle's Kill() to trigger EntityAlive's dropCorpseBlock()
+		- If the entity vehicle is configured using the following parameters, it'll drop a corpse block.
+			<property name="CorpseBlock" value="goreBlockAnimal"/>
+			<property name="CorpseBlockChance" value="1"/>
+
+	[ Events ]
+		- Added two new Mod events to subscribe too
+			- OnBloodMoonStart / OnBloodMoonEnd.	
+		- This feature is still under development.
+
+	[ Solution ]
+		- Added Peace of Mind and Sample Project to SphereII.Mods Solution
+
+	[ Peace of Mind ]	
+		- Fixed an issue where the noose block was causing a warning [ thanks blue name ]
+
+	[ Sample Project ]
+		- Fixed an a block warning [ thanks blue name ]
+
+
+
+Version: 1.0.56.1453
+	[ Sprinklers ]
+		- Fixed an issue where water sprinklers were not turning on and off on dedicated servers
+
+	[ Freshness ]
+		- Removed test buff of "buffFreshnessSCore" when using the Freshness system and Food Spoilage.
+
+	[ Portals ]
+		- Fixed a null reference when adding a portal key to the text
+		- Fixed another null reference where there was not a smart mesh on the block
+		- Fixed an issue where the player would exist in the same block space as the portal, causing the player unstuck message
+			- Moved player position up by 1 on teleport.
+
+	[ Advanced Items - Sharpen ]
+		- Changed the Sharpen feature to put new item right into backpack / ground, rather than through the crafting queue
+		- Previously, if you cancelled the resharpen from the crafting queue, you'd get the ingredients of the item back, and not the item you were sharpening.
+
+	[ Spawn Particle On Block ]
+		- Experimental
+		- Added a series of Harmony patches under Features/Particles/Harmony/Blocks.xml
+		- OnBlockDamaged, OnBlockAdded, OnBlockRemove
+		- This will add the specified particle to the block whenever those events are added, if defined on the block.
+		- The following syntax is supported:
+
+		<block name="blah" >
+    		<property class="Particles" >
+				<!-- Use this particle when the block is added to the world. -->
+				<!-- comma delimited, if you want to randomize which particle. -->
+				<!-- otherwise, just a single bundle reference.
+       			<property name="OnSpawnParticle" value="unitybundle,unitybundle2"/>
+
+				<!-- If you want to change the particle based on biome?-->
+				<!-- Use OnSpawn_<biome name> -->
+       			<property name="OnSpawnParticle_pine_forest" value="unitybundle,unitybundle2"/>
+				<!-- Probably of each block that gets a particle -->
+       			<property name="OnSpawnProb" value="0.2"/>
+
+       			<!-- If you want a different particle for when it gets damaged -->
+       			<property name="OnDamagedParticle" value="unitybundle,unitybundle2"/>
+       			<property name="OnDamagedParticle_snow" value="unitybundle,unitybundle2"/>
+       			<property name="OnDamagedProb" value="0.2"/>
+    		</property>
+		</block>
+
+Version: 1.0.51.1516
+	[ Resharpen ]
+		- Fixed an issue where the option would not be properly enabled.
+			- Was looking for the wrong property name.
+		<property name="SharpenItem" value="sharpeningStone" />
+
+	[ SphereII A Better Life ]
+		- Many fixes to the models to improve and add hit boxes ( xyth )
+		- Enables more fishes from pipermac. (xyth)
+		- Fixed the ModInfo.xml's name entry so it's properly ordered.
+
+Version: 1.0.49.1202
+
+	[ Repair From Containers ]
+		- Adjusted ordering of Nearby Enemy filter
+			- Check to see if in Party
+			- Check if nearby entity is in party
+			- Check if nearby entity is an ally
+			- Then check if nearby entity can damage you.
+		- Previously, the "can damage you" check was before the Party check
+
+	[ Food Spoilage ]
+		- Moved Food Spoilage to a Feature folder
+		- Food Spoilage items will have a new MetaData called "Freshness", which is a percentage of freshness less max durability.
+			currentSpoilage / maxSpoilage
+		- Freshness percentage is stored as 0,1 value, with 0.1 being 10%, and 1 being 100% fresh.
+		- The following vanilla code should be able to compare it through a requirement.
+			<triggered_effect trigger="onSelfPrimaryActionEnd" action="AddBuff" buff="buffStillFresh">
+				<requirement name="CompareItemMetaFloat" operation="GTE" value="0.1" key="Freshness"/>
+			</triggered_effect>
+
+		- New Harmony Patches to allow custom Item Type Icons.
+		- If the Freshness % is above 0%, it will use the AltItemTypeIcon, if it's defined.
+		- If no AltItemTypeIcon is defined, nothing will display.
+		- Once freshness reaches 0%, the ItemTypeIcon will be used, if it's defined.
+		- Example item entry.
+				<!-- If there's freshness still available, display the campfire icon -->
+				<property name="AltItemTypeIcon" value="campfire"/>
+				<!-- If there's no freshness left, display the cold  icon -->
+				<property name="ItemTypeIcon" value="cold"/>
+
+
+	[ FreshnessOnly - A Food Spoilage Sub-Feature ]
+		- Added a Freshness Only property for ItemClass entry.
+			<property name="FreshnessOnly" value="true" />
+		- This FreshnessOnly property unlocks a light-weight food spoilage implementation.
+		- The concept of this feature is to provide an incentive to eat food fresh, without punishing players who are not interested in it.
+		- If the FreshnessCVar property is defined, then only the cvars listed will be executed again with the multiplier.
+			<property name="FreshnessCVar" value="cvar1,cvar2" />
+		- By default, FreshnessCVar is "all". 
+		- If FreshnessCVar is "none", then all ModifyCVars will be ignored from the multiplier.
+
+		- Items with this property set to true will not downgrade to another item when spoiled.
+		- All items in the same stack will lose its freshness at once.
+		- If this freshness value is 0%, then it will no longer perform calculations
+		- If this freshness value is 0%, the durability bar will disappear, and the item will appear normally.
+		- If a freshness value is greater than 0%, then the value of the consumable will be multiplied by that percentage
+
+		- Example:
+			<triggered_effect trigger="onSelfPrimaryActionEnd" action="ModifyCVar" cvar="$waterAmountAdd" operation="add" value="20"/>
+			With a freshness value of 0.5 ( 50% )
+				- the $waterAmountAdd will be increased by 20
+				- the $waterAmountAdd will be further increased by 10.    20 * (.50 + 1 )
+				- The total $waterAmount will be 30
+
+		- When a consumable is ate when it's still fresh, a buff will be applied, letting the player know a bonus is active.
+		- Example Implementation:
+			<append xpath="/items/item[@name='drinkJarBlackStrapCoffee']">
+				<property name="Spoilable" value="true" />
+				<property name="SpoiledItem" value="drinkJarBlackStrapCoffee" />
+				<property name="ShowQuality" value="false" />
+				<property name="SpoilageMax" value="1000" />
+				<property name="FreshnessOnly" value="true" />
+				<!-- if specified, it'll only re-trigger the following cvars -->
+				<property name="FreshnessCVar" value="cvar1,cvar2" />
+				<!-- If there's freshness still available, display the campfire icon -->
+				<property name="AltItemTypeIcon" value="campfire"/>
+				<!-- If there's no freshness left, display the cold  icon -->
+				<property name="ItemTypeIcon" value="cold"/>
+			</append>
+			
+	[ SphereII Larger Party ]
+		- Added a XUi/Config/windows.xml to increase the side of the window for more players.
+
+Version: 1.0.46.1010
+	[ EntitySwimingSDX / EntitySwimmingSDX ]
+		- Fixed an issue where fish were leaving the water.
+		- Each fish searches for water blocks in its area, and uses that to validate it's pathing.
+		- If a fish has less than 20 water blocks, it'll despawn.
+		- If a fish leaves the water, it'll despawn.
+		- Added new class reference to fix spelling error in Swimming.
+			EntitySwimmingSDX and EntitySwimingSDX are the same, code-wise.
+		- Kept spelling error to maintain references
+		
+
+	[ A Better Life 1.0.0.732 ]
+		- Adjusted the ModInfo.xml's Name value
+		- Added the ability to auto-generate the version number.
+		- Adjusted the entityclasses.xml for class reference for extends.
+		
+
+Version: 1.0.45.1058
+	[ Check Items For Valid Containers ]
+		- Fixed another null reference when blocking an item from the NPC's loot container.
+		- Added filter for ItemValue's MetaData to exclude them from being added to a chest
+		- If an ItemValue has a Meta Data of "NoStorage", with a value greater than 0, it will be blocked.
+	
+	[ NPCs ]
+		- Added a few new properties to NPCs to block them from being added to storage.
+		- These are processed regardless of tags on the storage container or item.
+		- When an NPC is being picked up, NoStorage is read from the entityclass.
+		- By default, without this property, storage is allowed.
+		- npcNoStorage localization is added to the 0-SCore's Localization
+
+		Example syntax:
+			<append xpath="/entity_classes/entity_class[@name='npcMeleeTemplate']">
+				<property name="NoStorage" value="true" />
+				<property name="DisallowedKey" value="npcNoStorage" />
+			</append>
+	
+Version: 1.0.45.853
+	[ Check Items For Valid Containers ]
+		- Fixed a null reference when opening up zombie loot bags, because they do not have block properties.
+		- Questioning life choices that I did not name this feature correctly, and will be forever doomed calling it "Check Items For valid Containers"
+		- Added additional check for block at the tile location's position
+
+	[ ModEvents ]
+		- Removed a usefuless warning about duplicate mods folder ( this is the standard now )
+		- This provides a quick hash of all installed mods, allowing overhauls to quickly see at a glance if it matches the expected value.
+		- The hash is made up of modlet name + version number. 
+		- If more mods are installed than expected, or it has different version numbers, the hash will change.
+		- Changed the mod hash from a GetHashCode() to a truncated Sha256 value
+			Modlet List Hash: 7E5FF
+
+Version: 1.0.44.1602
+	[ Check Items For Valid Containers]
+		- Introduced a new feature through a series of Harmony patches that allows you to filter items from storage containers.
+		- Allows you to filter items being added to any given Loot Container based on tags.
+		- A container with the AllowTags set to "all", will allow all items.
+		- A container with no AllowTags or DisallowTags will not be checked at all, and act normally.
+
+		- If a loot container has the following property, then it will only allow items that have those tags to be stored.
+			<!-- Only melee, axe, and repairTool items are allowed to be added -->
+			<!-- But it will not accept any lightarmor -->
+			<property name="AllowTags" value="melee,axe,repairTool" />
+			<property name="DisallowTags" value="lightarmor" />
+
+			<!-- Items.xml entry -->
+			<item name="meleeToolRepairT0StoneAxe">
+				<property name="Tags" value="axe,melee,light,tool,longShaft,repairTool,miningTool,attStrength,perkMiner69r,perkMotherLode,perkTheHuntsman,canHaveCosmetic,harvestingSkill,corpseRemoval"/>
+
+			<!-- Example -->
+			<block name="cntSphereTagTest">
+				<property name="Extends" value="cntWoodWritableCrate"/>
+				<property name="LootList" value="playerWoodWritableStorage"/>
+				<property name="AllowTags" value="melee,axe,repairTool" />
+			</block>
+
+		- If an item is blocked, a denied UI sound will be triggered.
+		- If an item is dragged and dropped in a blocked container, a tooltip will also display.
+		- Shift clicking on an item to move it will play the denied UI.
+	
+		- If a block has the following Property, this will be used to check for localization and display a custom blocked message.
+			<property name="DisallowedKey" value="NoPickUpForNPCs" />
+		- This property can also exist on the Item entry as well, and will over-ride the block's message, if it's set.
+		- If not otherwise set, the default localization entry will be displayed.
+			
+Version: 1.0.43.1207
+	[ Fire Manager ]
+		- Removed the DynamicMeshChunk update, which was likely needless, and likely caused a performance issue.
+
+		- Added new property on a block to replace the target block with an ExtinguishedUpgradeBlock.
+			<property name='ExtinguishedUpgradeBlock' value='burntBlock' />
+		- When a block is extinguished, it will turn into this block.
+		- Damage from the original block is transfered over to the new block
+		- If the damage from the original block is greater than the new block's max health, it'll turn into an air block.
+		
+
+	[ SphereII Larger Parties ]
+		- New modlet that allows Parties up to 100 members.
+		- Added a Minimum exp value for shared exp.
+		- Default Minimum Exp is 200.
+		- Not included into 0-SCore, because there is a transpiler patch.
+
+Version: 1.0.39.746
+
+	[ One Block Crouch ]
+		- Disabled one block crouch by default.
+	
+	[ Take And Replace ]
+		- Fixed an issue where the original default behaviour was broken.
+		- A new Configuration Block entry called "Legacy" is set to true, going to default behaviour.
+
+		<!-- To enable advance configuration settings. -->
+		<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='AdvancedPickUpAndPlace']/property[@name='Legacy']/@value">false</>
+
+Version: 1.0.38.1615
+
+	[ Food Spoilage ]
+		- Adjusted references within the patches to use their full __instance values, rather than creating shorter forms for cleanliness
+		- Fixed an issue where a stack was spamming unlimited rotten meat
+
+	[ 0-SCore Blocks ]
+		- Added new class to blocks.xml to support PickUpAndReplace features. 
+			<property class="AdvancedPickUpAndPlace">
+				<property name="Logging" value="false"/>
+				<property name="TakeWithTool" value="meleeToolRepairT1ClawHammer" />
+			</property>
+
+	[ Take And Replace ]
+		- When a TakeWithTools property is set, the default item of clawHammer gets cleared.
+		- Fixed the ordering of material checks according to the xml defined order.
+			-> is Block a Valid Material to pick up?
+			-> Do we need to check the hand item for pick up?
+				-> Are we holding one of those tools?
+			-> Does our current hand item have the proper material tag?
+
+		- Trying a new design pattern.
+			-> Hold unto your hats.
+
+		- Created some helper shortcuts in order to reduce hard coding many references in the blocks.xml/shapes.xml
+		- If the TakeWithTool property exists on the block / shape, then a lookup against the AdvancedPickUpAndPlace class is triggered.
+			-> ValidMaterials operates the same style of lookup.
+		- This lookup uses the value of the TakeWithTool from the block/shape as a key to an entry in AdvancedPickUpAndPlace.
+			For Example:
+				<!-- blocks.xml -->
+				<property name="TakeWithTool" value="WoodenFenceTools" />
+				<property name="ValidMaterials" value="woodMaterial"/>
+			
+				<!-- Config Block -->
+				<property class="AdvancedPickUpAndPlace">
+      				<property name="Logging" value="false" />
+					<property name="TakeWithTool" value="meleeToolRepairT1ClawHammer" />
+      				<property name="WoodenFenceTools" value="meleeToolRepairT0StoneAxe,meleeToolRepairT0TazasStoneAxe,meleeToolRepairT1ClawHammer,meleeToolAxeT1IronFireaxe,meleeToolAxeT2SteelAxe,meleeToolAxeT3Chainsaw">
+					<property name="woodMaterial" value="Mwood_weak,Mwood_regular"/>
+			    </property>
+
+		- You may append to the class with your own unique keys
+			<append xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='AdvancedPickUpAndPlace']">
+				<property name="WoodenFenceTools" value="meleeToolRepairT0StoneAxe,meleeToolRepairT0TazasStoneAxe,meleeToolRepairT1ClawHammer,meleeToolAxeT1IronFireaxe,meleeToolAxeT2SteelAxe,meleeToolAxeT3Chainsaw" />
+			</append>
+		
+Version: 1.0.37.1432
+	[ Localization ]
+		- Updated some missing localization entries.
+
+	[ Food Spoilage ]
+		- Fixed an issue where a stack was spamming unlimited rotten meat
+		- Issue was related to the Spoilage meter on an item not being reset properly after each spoiled item.
+
+	[ Jiggle Adjustments ]
+		- If you are under 18, stop reading.
+		- This is mostly for xyth, who is more assuredly considered old enough to view.
+		- Exposed two properties for EntityAlive's:
+			<!-- Always enable the jiggle script, regardless of distance -->
+			<property name="AlwaysJiggle" value="true" />
+
+			<!-- Never downscale the AI, regardless of distance -->
+			<property name="NeverScaleAI" value="true" />
+
+
+Version: 1.0.32.940
+
+	[ CompoPackTweaks ]
+		- main host for the CompoPackTeaks, which is used by the CompoPack Team
+		- You do not need to install this yourself for compopack; they supply it.
+		- Removes the warning for the DMS when new traders are added.
+		- Can be used by other groups for the same purpose.
+
+	[ ObjectiveGiveBuffSDX ]
+		- Removed the hard-coded "buff" word after the "Get <Buff>" string.
+
+	[ Take And Replace ]
+		- Added a property option to block / shape to allow filtering based on hand item.
+			<property name="TakeWithTool" value="clawHammer,stoneAxe" />
+		- If this property is specified, the Take Prompt will only show when you are holding that item.
+			- This happens after we've checked ValidMaterial, and passed the material check for pick up.
+		- If this property is not specified, then the Take Prompt will show up for those blocks.
+		- Note: HoldingItem property is still valid. The item(s) specified in this property will half the time it takes for the block. 
+
+        - If the item that you are holding has the tag "silenttake", then no sound will be played when a block is taken.
+			- This happens regardless if the tool is specified in TakeWithTool or HoldingItem.
+			- If you can take a block, and have that tag on your hand item, no sound will be played.
+		- Updated the "Take Sound" to be more appropriate for the material you are taking.
+			- Wooden sound for wood materials. Steel sound for steel materials.
+
+		- Added a property option CheckToolForMaterial, with the default being false.
+			<property name="CheckToolForMaterial" value="true"/
+		- If this property is defined and set to true, then the block will check for a tag on the holding item
+		- The tag on the holding item must be the material ID that is allowed to be picked up.
+			<item name="meleeToolRepairT0StoneAxe">
+				<!-- Allow the stone axe to pick up any block that is Mwood_weak or Mwood_regular.
+    			<property name="Tags" value="<ommitted for clarity>,Mwood_weak, Mwood_regular"/>
+
+		<!-- full example : -->
+		<append xpath="/shapes/shape[@name='windowBoarded']">
+			<property name="Class" value="TakeAndReplace, SCore"/>
+			<property name="CanPickup" value="true"/>
+			<property name="TakeDelay" value="8"/>
+			<property name="PickUpBlock" value="woodShapes:VariantHelper"/>
+
+			<!-- Only allow picking up window board blocks that are weak or regular wood -->
+			<property name="ValidMaterials" value="Mwood_weak,Mwood_regular"/>
+
+			<!-- Only allow picking up blocks with this tool being held. -->
+			<property name="TakeWithTool" value="meleeToolRepairT0StoneAxe,meleeToolRepairTazaStoneAxe"/>
+				
+			<!-- Check the currently held tool's tag for the material of the block / shape being picked up -->
+			<!-- note: That means that the stone axes must have a Mwood_weak tags in order to pick up those blocks -->
+			<property name="CheckToolForMaterial" value="true" />
+		</append>
+
+
+
+Version: 1.0.31.1121
+	[ Events ]
+		- Added a new folder Scripts/Events
+		- Added new event EventOnBuffAdded.OnBuffAdded, which is triggered whenever a buff is added.
+			- This event was not strictly necessary for the ObjectiveBuffSDX quest, but left just in case it's useful.
+		- Moved EventOnEnterPoi.OnEnterPoi to this new folder. This event is fired whenever a player enters the POI bounds.
+
+	[ Quests ]
+		- Fixed an issue with ObjectiveBuffSDX by adding in the necessary event hooks
+		- ObjectiveBuffSDX will be checked whenever a buff is added, or if a buff is already present, when the objective is current.
+		
+		- Cleaned up QuestActionGiveBuff
+		- Added example syntax in quests.xml of 0-SCore
+
+			<objective type="BuffSDX, SCore" >
+				<property name="phase" value="3" />
+				<property name="buff" value="buffIsOnFire" />
+			</objective>
+
+			<action type="GiveBuffSDX, SCore">
+				<property name="value" value="buffRadiation01" />
+				<property name="on_complete" value="false"/>
+				<property name="phase" value="4" />
+			</action>
+
+	[ Take and Replace ]
+		- Added a material filter to the PickUpAndReplace block.
+		- If the block or shape does not have the listed material, the prompt will not show up, nor will the block work.
+		- Removed some default shapes and blocks from the Take And Replace modlet.
+		- Default: "Mwood_weak,Mwood_weak_shapes,Mwood_shapes";
+		- If a block / shape has the following property, it will use them over the default.
+			<property name="ValidMaterials" value="" />
+		- It is a comma-delimited list. 
+		
+Version: 1.0.30.1042
+
+	[ NPCs ]
+		- Fixed an issue when NPCs could not move around, and were stuck in inital pose.
+	
+
+Version: 1.0.29.1609
+
+	[ SmartText Mesh ]
+		- Added a Harmony patch to protect against null reference due to the Signs Feature.
+		- Sign Feature hides the wooden mesh and Text from showing up. This harmony patch protects against
+			when the text is changing, and the TextMesh isn't enabled (yet).
+
+	[ Signs ]
+		- Fixed issues with signs not generating correctly.
+		- ImageWrapper, the basis of the image signs, has been modified to support a VideoPlayer
+		- Gifs are no longer supported unfortunately due to shader issues.
+		- Gif and Gifv links are converted by ImageWrapper to be a mp4 URL.
+			- This probably only effectively works if you use an imgur link.
+		- This is then fed to the VideoPlayer as a Source URL.
+		- When the http:// link is removed, the sign is reverted back to vanilla texture and mesh.
+		
+	
+			
+Version: 1.0.28.1841
+
+	[ EntityAliveSDX ]
+		- Fixed a null reference when picking up an NPC and selecting their item.
+			- It was storing a LootListName, which may be null, causing the null ref.
+
+	[ Signs ]
+		- Fixed an issue with http:// images not displaying correctly on signs.
+		- Problem was identified that the new shader on the signs weren't allowing it.
+			- Added a SCoreModEvents.GetStandardShader() that returns a Standard shader.
+			- When using a custom http:// link, it will switch to this shader.
+		- A Redesign is necessary.
+		- Known Issue: URL text still shows up. Sometimes image doesn't.
+
+Version: 1.0.25.1115
+	- Rebuilt, and fixed against b326.
+
+	[ Take And Replace ]
+		- Fixed a null reference if the PickedUpItemValue was null on a block.
+
+Version: 1.0.23.1434
+
+	[ Soft Hands ]
+		- Fixed an issue where Soft hands was not negated by the new equipment system
+
+	[ Take And Replace ]
+		- Modifed the class to better support shapes.
+		- If a property called PickUpBlock is available, it'll give you whatever resource is listed there.
+		- If the property is not there, it'll give you the same block you pulled off.
+		- Example:
+            <append xpath="/shapes/shape[@name='windowBoarded']">
+                <property name="Class" value="TakeAndReplace, SCore"/>
+                <property name="CanPickup" value="true" />
+                <property name="TakeDelay" value="8"/>
+                <property name="PickUpBlock" value="resourceWood"/>
+            </append>
+		-> Order of reading PickUpBlock:  current block, PickUpBlock from Shape, and PickUpBlock from block.
+
+	[ Portals ]
+		- Fixed a Portal Null reference when trying to access the block.
+
+Version: 1.0.22.1055
+
+		- Cleaned up old debug statements.
+
+	[ NPC ]
+		- Fixed a null reference when opening a backpack from a dead NPC
+
+	[ Broadcast ]
+		- Fixed an issue where the button was not working properly
+
+	[ Localization ]
+		- Fixed some localization settings.
+
+Version: 1.0.19.1056
+	- Restructured Repo to include a top level Mods folder.
+
+Version: 1.0.19.944
+	[ Powered Workstations ]
+		- Fixed a bug where workstations would get free power if they did not have RequirePower set to true.
+
+Version:1.0.18.1549
+
+	[ Pathing Cube ]
+		- Fixed an issue where a Pathing cube would throw a null reference.
+			- Got an updated block from xyth
+			- Updated the code to work with TextMesh.
+
+	[ Challenges ]
+		- Added a challenges.xml file, all commented out.
+		- Shows how to add a new category, group, and challenges.
+
+Version: 1.0.18.2207
+
+	- Rebuild against b317
+
+	[ UAI ]
+		- Fixed broken reference in UAITaskMoveToTarget.
+			- This used to set a reference to the closes enemy and player. However, those fields are no longer available.
+			- Player reference is now set up for aiClosestPlayer.
+
+Version: 1.0.17.1452
+	- Recompiled against latest experimental build
+	- Fixed a few over-rides that changed in EntityAliveSDX, and AddBuff()
+
+	[ Known Issues ]
+		- Pathing Cubing Errors out on save.
+
+	[ Advanced Items - Scrap ]
+		- Fixed another issue where the temporary recipe was adjusting the master recipe, causing scrap information to be lost.
+
+	[ Food Spoilage ]
+		- Documenting a global Block Property for FullStackSpoil. This will cause the entire stack to spoil at once, rather than individual.
+		- <property name="FullStackSpoil" value="true" />
+		- This property may be defined on individual items to over-ride the global result.
+
+	[ ItemValue Clone() ]
+		- Modified the Patch to ItemValue to be a Postfix, and only re-does the Metadata dictionary, if conditions are correct to execute. 
+		- See previous release notes about the Meta Data for details.
+
+Version: 1.0.15.1402
+
+	[ Food Spoilage ]
+		- Fixed an issue where PreserveBonus was not being calculated correctly.
+		- NOTE
+			- Identified a potential issue with the ItemValue's Meta data is not being properly disconnected when a stack is split.
+			- The result of that is when we store the Item's next spoilage tick is shared between the stack.
+			- If a stack is split, the next spoilage tick is still synced up with all stacks from the original
+			- When spoilage is applied to the first stack, all child stacks will also spoil at the same rate, regardless of location.
+
+			- As a workaround, I have added a new blocks.xml property that patches ItemValue's Clone() call.
+			- This patch is only fired when Food spoilage is enabled, and only if the item supports food spoilage itself.
+			- Default is false, do not apply this patch regardless.
+			
+			<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='FoodSpoilage']/property[@name='UseAlternateItemValue']/@value">true</set>
+
+
+	[ Advanced Items - Scrap ]
+		- Fixed an issue when scrapping an item, it would allow unlimited crafting of that item.
+			- oops.
+		- Cleaned up code a bit.
+
+Version: 1.0.14.1543
+	[ Anti Nerd Pole ]
+		- Fixed an issue where a block was consumed on a failed placement.
+			- Still needs testing on MP.
+	
+	[ Lock Code ]
+		- Removed a Debug statement about Mouse 0.
+
+	[ EntityAliveSDX ]
+		- Added a CanCollideWith() check, from EntityAliveV2.
+			- To enable this, set <property name="CanCollideWithLeader" value="false" />
+			- Default is true, it can collide with leader.
+
+	[ Food Spoilage ]
+		- Refactored Food Spoilage to use ItemValue's MetaData, instead of UseItem
+		- Created several helper methods, and cleaned up references
+		- Updated variables to follow project standards.
+
+Version: 1.0.10.1107
+	[ SCore Utility Settings ]
+		- Added a Sirillion modified window
+		- Added a toggle to force vanilla lock picking, if Locks is installed
+		- Added a toggle to force Locks to be used, if installed, regardless of keyboard / controller
+		- Added a toggle to mute Trader Rekt
+		- Added a toggle to mute all Trader's voices.
+		- Added a toggle to mute NPC foot steps
+		- This screen can be manipulated through xpath to remove features in overhauls that may not be desirable.
+
+	[ Advanced Lock Picking ]
+		- New-ish UI window for Advanced Lock picks with some cleaner description.
+		- Added new lines in the blocks.xml to allow customized key bindings
+		- These are comma delimited list, so you may add more to the list.
+				<property name="Left" value="Keypad4" />
+				<property name="Right" value="Keypad6" />
+				<property name="Turn" value="Keypad8,Keypad5,Keypad2" />
+		- Defaults are still hard coded:
+			- A / D / Space
+			- Joy stick support
+			- Mouse support - Scroll up / down to move, click to try.
+			- Follows mouse position as well.
+
+	[ Challenges ]
+		- Added support for custom challenges
+		- Features/Challenges
+			- Uses a Harmony patch to allow proper checks
+
+ 		- Added new Enter POI Challenge.
+			POIs can be referenced by prefab name using the prefab attribute.
+				<objective type="EnterPOI, SCore" prefab="abandoned_house_04" count="10"/>
+			POIs can also be referenced by POI Tags.
+				<objective type="EnterPOI, SCore" tags="wilderness" count="1"/>
+			Objectives that list both name, and tags, must match both to pass the objective.
+				<objective type="EnterPOI, SCore" prefab="abandoned_house_04" tags="wilderness" count="1"/>
+				
+
+	[ Auto Redeem Challenges ]
+		- Removed a check on the MinEventActionAutoRedeemChallenges that was checking if there was any any challenges to redeem
+			- In reality, this was just duplicating the same loop as it was going to do anyway.
+
+		- Added Harmony Patch and cvar for AutoRedeeming, available through the SCore Utility Screen
+
+	[ Disable Flickering ]
+		- Added a Harmony patch to disable flickering lights and lightening flashes.
+		- See Config/blocks.xml to toggle on or off.
+
+	[ Block Configuration ]
+		- Added a new optional parameter to CheckFeatureStatus().
+		- Defaults to false, which is typical behaviour of checking the Configuration Block for the setting.
+		- If true is passed as the third parameter, then it'll check the local player's cvar.
+		    public static bool CheckFeatureStatus(string strClass, string strFeature, bool checkCVarFirst = false)
+		- This is useful if there's a feature you want to expose to the SCore Utility Settings screen
+
+	[ Transmogrifier ]
+		- Added a FastTag check for Crawler to exclude them
+
+	[ TriggeredSDX ]
+		- Fixed a typo that could cause a null ref if a property was not specified
+		- Added support for passing cvar from player to animators
+			<property name="CopyCVarToAnimator" value="cvar1;cvar2;cvar3" />
+
+		- This will loop around the animator, doing a SetFloat() on the animator, using the cvarname, and cvar value.
+
+	[ ToggleButtonCVar ]
+		- Added a new controls.xml entry for ToggleButtonCVar
+		- This allows you to define a cvar and have it tied to a cvar on the local player
+		- This is used in the SCoreUtilities to allow adding toggle buttons quicker, without modifying c# code.
+		- Add in a new toggleButtonCVar to SCoreUtilities window.
+
+		<togglebuttonCVar name="xuiSCoreUtilsLockPick" caption_key="xuiSCoreUtilsLockPick" cvar="LegacyLockPick"
+        	tooltip_key="xuiLockPickingToolTip" width="290" height="32" depth="3" />
+
+Version: 1.0.5.826
+
+	[ Farming ]
+		- Added code to disable sound from a sprinkler when being destroyed.
+		- Merged Yakov's changes for optional setting for Sprinklers to require to be connected to pipes to work.
+				<property name="RequirePipesForSprinklers" value="false" />
+			- Default is false; no change from original.
+
+	[ TriggeredSDX ]
+		- Cleaned up class a bit
+		- Fixed an issue where the prompt would not show up when needed.
+
+	[ SphereII Peace of Mind ]
+		- Merged SphereII PG13 into Peace of Mind modlet
+		- Mutes Rekt's audio to clean up his abbrasive attitude
+			- This was easier than trying to go through each of his audio dialogs, and finding out which ones
+				where least offensive.
+		- Removed Noose blocks, replacing them with Air.
+		- Changes the Party Girl's model to be that of Marlene's.
+			- Quests, Challenges, etc are still working.
+		- Removed the block with bodies hanging from pillar.
+		- If 0-SCore is available, flickering / pulsating lights will stay constantly on.
+		- Removes the lightning flashes.
+
+
+Version: e1.0.1.1224
+
+	Available: https://github.com/SphereII/SphereII.Mods/tree/1.0e
+
+	- Initial release of 0-SCore for 1.0 experimental.
+	- There is probably a TON of broken stuff still
+	- Overhaulers can start to consume and test out their features.
+
+	[ 1.0 Port ]
+		- Update public field changes in the console commands
+		- Update many FastTags
+		- Removed UMA Patches
+		- Probably much to do 
+
+	[ Fire Manager ]
+		- Converted CheckBlocks into a coroutine.
+			- Will process 10 blocks per frame now.
+			- Changes are still distributed to all clients at the same time
+		- Added a rainfall check.
+			- Gives a bonus to extinguish chance when raining. 
+			- Doubles the Change To Extinguish.
+			- This might not stay.
+		- If FireSound is set to None, then no sound will play.
+		- Changed CheckFireProximity to default to -1 if not close to fire.
+
+	[ MinEffect ]
+		- Added an AutoRedeemChallenges mineffect. Add to something like buffstatus01
+		- Auto redeems all completed challenges.
+			<triggered_effect trigger = "onSelfBuffUpdate" action="AutoRedeemChallenges, SCore"  />
+
+	[ Remote Crafting / Repair ]
+		- Updated code to use the TEFeature for lootable
+		- Cleaned up repair code
+		
+
+	[ skipnewsscreen ]
+		- Added command line parameter to skip starting news screen
+			-skipnewsscreen
+		- When the score's -autostart command argument is used, it will also skip the news screen.
+
+
+	[ Powered Workstation ]
+		- Adjusted fuel checks on wireless power feature.
+		- If there's alternative fuel, such as wood, this will be used as a priority.
+		- If there's no alternative fuel, then it will check for wireless power.
+			- If wireless power is found, then burn time will be set to 15f.
+			- If a wireless power is not found, then burn time will be set to 0.
+
+	[ Spawn Entity On Death ]
+		- Fixed an issue where, when using an entitygroup, was always picking the first entry
+
+Version: 21.2.205.1412
+
+	[ Fire Manager ]
+		- Adjusted the random expiry time for extinguished smoke.
+		- Removed an additional RemoveFire() from the Extinguish MinEffect.
+			- It was removing the fire, then extinguishing the fire, which also removed the fire.
+		- Fixed an issue where resetting a POI with a fire trap on would extinguish the fire trap, although keep its damaging effect.
+			- Changed the SetBlock to check if the burning block is in the Fire Map before resetting it's particle.
+			- This may have a side effect where there is a potential that not all fire will be extinguished from a quest-resetted POI.
+
+	[ Powered Workstation ]
+		- Removed a check on if the current fuel is below 0.5. 
+		- Powered workstation will now check on each Update Tick, and add 15 fuel
+		- Removed a call to get the block from the chunk position, rather than using the locally available block information.
+
+	[ Spawn On Death ]
+		- The Spawn on Death hooks have been expanded to support passing cvar and buffs over to the new entity.
+		- This change also introduces a new method to spawn entities that need this functionality.
+		- The following new properties are supported on the source entity (ie, the entity that is dying)
+
+			<!-- Spawn in using a method from FuriousRamsay to simplying spawning -->
+			<!-- This can be set without actually copying over cvars and buffs -->
+			<property name="SpawnOnDeathAltSpawn" value="true" />
+			
+			<!-- If any of the following properties are not found, then nothing is done for them -->
+
+			<!-- Copy all cvars over from the source to the new entity. -->
+			<property name="SpawnOnDeathCVarFilter" value="all" />
+
+			<!-- Copy all cvars that contain the word guppy. Position of the * does not matter. It's a contains check. -->
+			<property name="SpawnOnDeathCVarFilter" value="guppy*" />
+
+			<!-- Copy all buffs over from the source to the new entity. -->
+			<property name="SpawnOnDeathBuffFilter" value="all" />
+
+			<!-- Copy all buffs that contain the word guppy. Position of the * does not matter. It's a contains check. -->
+			<property name="SpawnOnDeathBuffFilter" value="guppy*" />
+
+			<!-- Both style of filters are comma delimited. -->
+			<property name="SpawnOnDeathBuffFilter" value="buffStatus, buffIsOnFire, buffIs*" />
+
+Version: 21.2.170.702
+
+	[ Fire Manager ]
+		- Fixed miswording on comment on smoke particle
+		- Made a change to particle rotation in an attempt to fix sideway smokes.
+		- Changed the ordering of fire/smoke particles to read RandomParticles first, then checks if blocks / materials had overrides
+			- Previously, if Random Particles was used, they would over-ride individual blocks
+		- Documenting that RandomFireParticle and RandomSmokeParticle exist.
+			- This is the documentation evidence.
+			- This will randomly select one of the particles in each one to display.
+			- You may use "NoParticle" to add a blank, ie skip, a particle.
+
+			<append xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='FireManagement']">
+				<property name="RandomFireParticle" value="#@modfolder(0-SCore_sphereii):Resources/guppySmokeParticles.unity3d?gupSmoke1,#@modfolder(0-SCore_sphereii):Resources/guppySmokeParticles.unity3d?gupSmoke2,#@modfolder(0-SCore_sphereii):Resources/guppySmokeParticles.unity3d?gupSmoke5" />
+				<property name="RandomSmokeParticle" value="#@modfolder(0-SCore_sphereii):Resources/guppySmokeParticles.unity3d?gupSmoke3,#@modfolder(0-SCore_sphereii):Resources/guppySmokeParticles.unity3d?gupSmoke4" />
+			</append>
+
+	[ Quests ]
+		- Fixed an issue in the ObjectiveGotoPOISDX where the random prefab name was being selected at initialiation,
+			rather than each time the quest is triggered.
+		- Before searching for the prefab, if the property name PrefabNames is set, it'll randomly pick one.
+		- Removed extra debug logs from ObjectiveBuffSDX
+
+Version: 21.2.151.1612
+
+	[ Quests.xml ]
+		- Fixed an issue where a starting comment was missing.
+
+	[ Encumbrance ]
+		- Added a check for mods on items, and calculate those item weights appropriately.
+		- Refactored a bit of the code to clean it up, and reduce duplicate checks.
+
+	[ One Block Crouch ]
+		- Added a Is Crouched check before lowering the camera.
+
+	[ Code Added, but not compiled ]
+		- NPCv2 code has been added, but excluded from building
+
+Version: 21.2.101.931
+
+	[ NPCs ]
+		New Property in the blocks.xml called EnemyDistanceToTalk, under AdvancedNPCFeatures.
+				<property name="EnemyDistanceToTalk" value="10" />
+
+		This value is used to determine how close an enemy needs to be, to block the NPC from talking with you.
+
+			A value of 0 or less will block this check, allowing you to talk to NPCs in all conditions.
+			A value of 5 will block NPC dialog options if an enemy is within 5 blocks of it.
+			Default is a value of 10.
+
+	[ Dialog ]
+		Added new requirement to dialog called EnemyNearBy. This is meant to work in conjunction with the EnemyDistanceToTalk,
+			allowing you to disable an enemy check for the overall dialog, while also providing the ability to hide certain dialog 
+			responses that may not be appropriate when in a battle.
+
+		This will show the requirement if it the enemy is within 10 blocks.
+			<requirement type="EnemyNearby, SCore" id="10" requirementtype="Hide" />
+
+		This will hide the requirement if it the enemy is within 10 blocks.
+			<requirement type="EnemyNearby, SCore" id="10" value="not" requirementtype="Hide" />
+
+	[ Remote Crafting ]
+		Added additional check for EnemyNearBy for remote crafting to take in consideration if a player is nearby,
+			if they are in the same party, or are friends with each other.
+
+
+Version: 21.2.80.1026
+	[ NPCs ]
+		- Merged khzmusik's fix to protect a player's followers from their own explosions.
+
+
+Version: 21.2.78.935
+
+	[ Lock Pick ]
+		- Removed Debug.Log in Lock picking, and replaced with a Logging check to display.
+
+	[ Particle Attractor ]
+		- Refactored FromAttackTarget to enhance functionality.
+
+			Example:
+
+				Minimum Example:
+					<triggered_effect trigger="onSelfBuffUpdate" action="SetParticleAttractorFromAttackTarget, SCore" />
+
+				Typical Example:
+					<triggered_effect trigger="onSelfBuffUpdate" action="SetParticleAttractorFromAttackTarget, SCore" cansee="true" />
+
+				Full Example:
+
+				<triggered_effect trigger="onSelfBuffUpdate" action="SetParticleAttractorFromAttackTarget, SCore" 
+					cansee="false"   <!-- Does the zombie need to see the player? --> 
+					speed="10"   <!-- Optional. Default to 5.  How fast the particle should go.  -->
+					transform="Particle attractor"    <!-- 
+															Optional. If not specified, it'll look for the first particleAttractorLinear script.
+															Searches through the entire zombie for the transform with this name.
+															It actually searches for all Particle Systems, then checks the transform name
+															so the effect is the same. 
+															** If the particleAttractorLinear does not appear on the transform, it'll add it **
+													-->
+					target_transform="hips" />		<!-- 
+														Optional. If not specified, it'll attach to the Head.
+														This allows you to specify a target transform, which transform to attach the particle too.
+														If this transform does not actually exist, it won't attach to any.
+														"head" and "hips" are shortcuts to GetHeadTransform() and GetPelvisTransform().
+														All others search.  -->
+							
+
+
+Version: 21.2.54.843
+	[ Disable Flickering Lights ]
+		- Added new Feature for Flickering Lights, and a matching Config Block Entry
+		- This will change all the Flickering lights to be static lights.
+		- This will disable lightning effects.
+
+	
+		<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='AdvancedPrefabFeatures']/property[@name='DisableFlickeringLights']/@value">true</set>
+
+	[ Peace Of Mind 21.2.1.0 ] 
+		- Updated Peace of Mind to only remove the Noose block with an air, leaving the other ropes available.
+		- Added Disabling of Flickering lights, if 0-SCore is available.
+			- If SCore is not available, it'll display a harmless warning.
+
+Version: 21.2.52.1028
+	[ Dialog ]
+		- Merged in khzmusik's dialog changes:
+			- Added new DialogRequirement of IsSleeper
+				Requires that the dialog's NPC must have been spawned into a prefab sleeper volume.
+			- Added `IDialogOperator` interface for requirements and actions that accept an "operator" attribute
+			- Updated Harmony patches to `DialogFromXML` to use the interface
+				- `DialogActionAddCVar`, `DialogRequirementFactionValue`, `DialogRequirementHasCvar`, and `DialogRequirementNPCHasCVar` now all implement that interface
+ 			- Major refactoring of `DialogRequirementNPCHasCVar`
+			- `DialogRequirementHasCVar` handles "not" operator better
+			- `DialogRequirementLeader` supports "not" as a value, which checks that the NPC is not hired by the player talking to it (as opposed to "HiredSDX" which just checks whether or not the NPC is hired by _any_ player)
+			- Added XPath in `dialogs.xml` that will test the various values of "HasCVarSDX" (the XPath is commented out)
+			
+	[ Entity Alive SDX ]
+		- Updated WeaponSwap to force an avatar update on placement
+			- It was observed that NPCs were not full initializing their weapons properly when the weapon
+				was using a different hand to hold it in.
+
+	[ Particle Attractor ]
+		- Added new feature "Particle Attractor"
+			- This allows running a particle between two points, one being the source entity and then the target entity.
+			- The script runs on the zombie, and needs to know a "target" to set the destination for the particle.
+
+		- To add the particleAttractorLinear to the zombie, the following line can be used:
+				<!-- if the zombie has the "Particle attractor" transform, it'll attach the script to it. -->
+				<triggered_effect trigger="onSelfBuffStart" action="AddScriptToTransform, SCore" 
+					transform="Particle attractor" script="particleAttractorLinear, SCore"/>
+
+			
+		- Added 3 new MinEventActions to support this feature, along with examples:
+			- Note: the trigger="" is just used as an example. Add the appropriate trigger for your use case.
+
+			<!-- If the zombie has an in-game attack target, such as a player, this will set the "target" in the particleAttractorLinear to it. -->
+			<!-- This will cause the particle to go from the zombie to the target, ie, the player. -->
+			<!-- An optional cansee flag can be toggle, which will do a visibility check before applying the target -->
+			<triggered_effect trigger="onSelfBuffUpdate" action="SetParticleAttractorFromAttackTarget, SCore" cansee="false"/>
+
+			<!-- This MinEvent runs on the Player, and can use the position AoE to find zombies in range which may have
+				an ParticleAttractor. If a zombie is found with the ParticleAttractor, it'll set the player as the target. -->
+			<triggered_effect trigger="onSelfBuffStart" action="SetParticleAttractorFromPlayer, SCore"/>
+
+			<!-- This MinEvent runs on the zombie, and can use the position AoE to find a player in range. 
+				If the zombie has a ParticleAttractor, it'll set the first player it finds as the target. -->
+			<triggered_effect trigger="onSelfBuffStart" action="SetParticleAttractorFromSource, SCore"/>
+
+Version: 21.2.49.751
+
+	[ Dialog ]
+		- Added new Dialog Requirement that checks cvar on the NPC.
+		- Follows the same format as the Player's HasCVar check.
+        	<requirement type="NPCHasCVarSDX, SCore" value="1" requirementtype="Hide" operator="GTE" 
+				id="quest_Samara_Diary" />
+
+	[ NPCs ]
+		- Adjusted the TeleportNow feature to be a bit more fault tolerant from teleporting NPCs into walls.
+		- Added new cvar to a few of the order buffs:
+				<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="Guarding" operation="set" value="1"/>
+		- This is meant to set a flag so we know if the NPC is supposed to be guarding, and will ignore commands.
+
+	[ MinEvent ]
+		Added new Min Event called TeleportNow
+			<triggered_effect trigger="onSelfBuffUpdate" action="TeamTeleportNow, SCore" />
+		- Any NPC within a 50 block range will teleport to you immediately. This is a short cut to the Come Here! command
+			in the Companion screen.
+		- If the NPC has the Guarding cvar, it will ignore this order.
+		- Added buff buffTeleportCooldown after TeleportNow as a cool down. Default is 5 seconds.
+		- Added item scoreTeleportNow for an example.
+			
+Version: 21.2.47.1657
+
+	[ MinEventActionOpenWindow ]
+		- To Better support modders' use of the Companions screen, a new minevent has been created.
+			<triggered_effect trigger="onSelfPrimaryActionEnd" action="OpenWindow, SCore" window="SCoreCompanionsGroup"/>
+		- This will open the xui.xml's Window Group
+
+		- A test item called scoreOpenNPCWindow has been added showing an example:
+
+     		<property class="Action0">
+        		<property name="Class" value="Eat"/>
+				<!-- Consume is set to false so the item doesn't get used up -->
+        		<property name="Consume" value="false"/>
+        		<property name="Delay" value="1.0"/>
+        		<property name="UseAnimation" value="false"/>
+        		<property name="Sound_start" value="read_mod"/>
+        		<property name="Sound_in_head" value="true"/>
+      		</property>
+      		<effect_group tiered="false">
+        		<triggered_effect trigger="onSelfPrimaryActionEnd" action="OpenWindow, SCore" window="SCoreCompanionsGroup" />
+      		</effect_group>
+		
+Version: 21.2.47.1616
+
+	[ XUiC ]
+		- Added a "Come Here!" to the list of commands.
+			- This is a Range-based, as are the other commands.
+			- It is intended to be used when the NPC is in a different room than you, and are stuck.
+			- This applies the Follow Buff to the NPC, so if they were told to Stay previously, they'll still come to you.
+			- This teleports to the Player position + 1. It's a very tight teleport.
+		
+
+Version: 21.2.46.1336
+
+	[ Fire Manager ]
+		- Added a check in Chunk.SetBlock(), that if the SetBlock is from a POI Reset, to remove the fire from any blocks that may be burning.
+
+	[ EntityAliveSDX ]
+		- Added a buff check in LeaderUpdate() to prevent a timing issue when you are dismissing an NPC
+
+	[ XUiC ]
+		- Shrunk the Utilities screen, and moved it to the center of the screen.
+		- Added new Companion Screen. These are defined in the xui.xml.
+		- Access to these screens are available in the Esc menu in-game.
+
+		- Companion screen shows all hired NPCs, their name, their distance, and allows you to give them orders.
+			- Orders are based on range, roughly 50 blocks.
+			- If the NPC is more than 50 blocks away, the commands are ignored.
+			- Dismissing an NPC through this screen is instant, and has no range check.
+
+Version: 21.2.44.1541
+
+	[ Fire Manager ]
+		- Another fix for Fire not damaging players on a dedicated server
+		- Fixed various typoes in a single debug log caused by a stroke.
+
+	[ EntityAliveSDX ]
+		- Removed one of the checks preventing you from talking to an NPC that was in battle. 
+			- Previously, there was a check to see if the NPC had an attack target. This was removed.
+			- Another check, right after that one, is still active. It scans to find enemies within 10 blocks, and prevents talking then.
+
+	[ NPC ]
+		- Small tweak to the CheckBlocked() to determine if the NPC will jump off the building after you.
+			- Previously, this just inched the NPC forward until they gracefully fell, but it may not have been enough in all cases.
+
+Version: 21.2.42.1753
+
+	[ XUiC ]
+		- Added new XUiC_SCoreUtilities controller to allow personalization of player experiences
+			- Personalization is limited to SCore features that some users may not like, and offer
+				no benefit other than comfort.
+			- Currently feature:
+				The ability to turn off the Lock MiniGame, if Locks is available.
+				The ability to turn off hired NPC foot steps, so you aren't hearing it constantly.
+
+			- By default, this screen is added to the inGameMenu window. 
+				- Pressing ESC to see the Exit / Option window will show it.
+			
+
+	[ Farming Manager ]
+		- Adjusted GetWaterPercent() to be a lower value to determine if its a plantable area.
+
+	[ Fire Manager ]
+		- Another potential fix for fire not hurting a player when in a multipler server.
+
+	[ EntityAlive SDX ]
+		-Merged in Pull Request 85 from khzmusik
+		- Remove the prompt to talk with enemy NPCs
+
+		- New blocks.xml Property to 
+			<!-- Set to true if some enemy NPCs are "advanced" NPCs that use EntityAliveSDX. -->
+			<property name="AdvancedEnemyNPCs" value="false" />
+			- When enabled, it'll remove the prompt to talk to non-friendly NPCs.
+			
+Version: 21.2.40.1024
+
+	[ EntityAliveSDX ]
+		- Fixed an issue with Weapon Swapping that would get triggered when an NPC only has an HandItem specified, and not
+			given an item through ItemsOnEnterGame.
+			- This generated the "Item Not Found" error.
+
+	[ Fire Manager ]
+		- Blind potential fix for fire not hurting a player, when in a Multiplayer server.
+			- When the fire buff is applied now to the player, the player itself will be the source of the damage (instigator id ).
+
+Version: 21.2.37.1618
+
+	[ TileEntitySign ]
+		- Fixed an issue where png files were not being displayed.
+		
+		Note: Gifs hosted on Imgur may not work. This is being looked at.
+
+	[ EntityAliveSDX ]
+		- Fixed an issue where the UseTimes on an item was not being preserved by an NPC
+			- This caused the UseTime to be reset when you pick up and place down an NPC.
+			- This was mostly evident by giving an NPC a partially spoiled item, then picking up and placing down the NPC to reset the spoilage counter.
+			- This was actually fixed in 21.2.31.1132
+
+Version: 21.2.31.1132
+
+	[ EntityAliveSDX ]
+		- Added new property StartingItems to specify items that will appear in the NPC's loot container on spawn in.
+
+			Example:
+				<property name="StartingItems" value="drinkJarBoiledWater=2,foodCanChili,medicalFirstAidBandage,meleeToolTorch,keystoneBlock,noteDuke01"/>
+
+			- Once added, it sets a cvar called "InitialInventory" to flag it was already done.
+			- Also updated DeployNPCSDX to support this.
+
+		- Fixed an issue where weapon swap got broken over a bad check
+
+		- Added new property PickUpItem to allow a custom item to be selected.
+			<property name="PickUpItem" value="MyNPCItem" />
+	
+			If the property is not there, it will use the default spherePickUpNPC.
+
+	[ DeployNPCSDX ]
+
+		- Added 2 new properties for the PickUp Item, to allow placing down an NPC pre-configured.
+
+			- This will allow you to recieve an NPC as an item.
+			- If the AutoHire property is set to true, it will auto-hire the NPC to the player placing it down.
+			- If the AutoHire property is not set, the NPC will not be hired on placing it down.
+			- If the property EntityName is set, it will assign that name to the NPC. 
+
+			Example:
+				<item name="spherePickUpNPC2">
+      				<property name="Extends" value="spherePickUpNPC" />
+      				<property name="EntityClass" value="npcBakerClub" />
+      				<property name="AutoHire" value="true" />
+				    <property name="EntityName" value="John Wayne" />
+    			</item>
+		
+
+	[ Fire Manager ]
+		Added a check to disable fire when Particle index is set to 0.
+			if (___explosionData.ParticleIndex == 0) return;
+
+
+
+Version: 21.2.27.1542
+
+	[ Trader Protection ]
+		- Added a check to allow you to talk to the trader during the night, when trader protection is off.
+
+	[ Portals ]
+		- Added a check for invalid portal positions
+
+Version: 21.2.18.1001
+	[ Trader Protection ]
+		- Added a check to disable Trader Teleport when crossing the bounds of a trader.
+	
+	[ Portal ]
+		- Added the ability to define a buff to activate the portal.
+			<property name="ActivateBuff" value="myBuff" />
+		- If this buff is defined, the buff must be active in order to use the teleport.
+			- When denied, the Portal will chime a Denied sign, and show the localization entry for xuiPortalDenied.
+			- If the Localization entry for xuiPortalDenied is an empty string, it will not chime, or show a tool tip on denial.
+		- For Powered Portals, this check happens after checking if the portal is powered.
+
+	[ EntityAliveSDX ]
+		- Added a sanity check for loot container size.
+
+	[ Spook ]
+		- Fixed an issue where the sky was not as dark as it was supposed to be.
+
+Version: 21.2.11.1647
+	[ Fire Manager ]
+		- Fixed an issue where fires could not be extinguished on servers.
+		- Fixed a potential issue with an excessive amount of net packages being sent.
+
+	[ NPC Weapon Swap ]
+		- Changed NetPackage for weapon swap
+		- Added new helper method in EntityAliveSDX to better handle it
+		- Added a preventative null check on FindWeapon()
+
+
+Version: 21.2.1.1646
+	[ Rebuild ]
+		- Re-built and re-linked against Alpha 21.2
+
+	[ Remote Crafting Utils ]
+		- Fixed a change in the TryStackItem in the loot container.
+
+Version: 21.1.111.950
+	[ Merging changes ]
+		The EntityName property setter is called in (at least) two cases for NPCs:
+
+			During EntityFactory.Create, when it is set to the entity class name
+			When the NPC entity is being re-created after being picked up and put down
+		
+		We should not set the private _strMyName in the first case, since that erases the random name chosen from the "Names" property in the entity class XML. 
+		But in the second case, the name that is being set was previously taken from the EntityName property, so should be the correct value chosen from "Names".
+
+Version: 21.1.110.1032
+	[ Buff / Quest From Sounds ]
+		- Fixed an issue where buffs / quests were not being properly read by sounds.
+
+	[ Hire CVars ]
+		- Added new cvar "CurrentHireCount" to keep track of the number of hired NPCs.
+		- This is cvar is updated when:
+			- An Entity is hired, the CheckStaleHires is ran, updating the cvar.
+			- When the MinEvent for ClearStaleHires fires:
+				<triggered_effect trigger = "onSelfBuffUpdate" action="ClearStaleHires, SCore"  />
+
+		- This cvar can be used in the dialog system as well, for requirements
+	        <requirement type="HasCVarSDX, SCore" requirementtype="Hide" id="CurrentHireCount" operator="LTE" value="3" /> 
+
+	[ Quest Objective Block Destroy ]
+		- Fixed an issue because I was calling the wrong net package, and changes were not being distributed properly to the party.
+
+Version: 21.1.97.930
+	[ Farming ]
+		- Fixed an issue where valves did not work properly on dedi
+
+	[ Dialog ]
+		- Added support to trigger an action from a statement, rather than only a response.
+
+	[ RequirementInVehicleSDX ]
+		- Added a fix for the name space. 
+			- This is waiting for a fix in vanilla before it functions.
+
+	[ Inert ]
+		- Fixed an issue where Inert was making invisible entities when paused.
+
+Version: 21.1.89.1227
+	[ Game Events ]
+		- Fixed typo in Vehicle.
+		- Added RequirementInVehicleSDX game events that takes a tag.
+			I don't even know if you can make this call from here. But the script is written.
+
+			<requirement class="InVehicleSDX , SCore">
+				<property name="invert" value="true" />
+				<property name="entity_tags" value="mytags" />
+			</requirement>
+
+Version:21.1.89.946
+	[ UAI ]
+		- Fixed an issue where NPCs could loot, but wouldn't keep any of the items it looted.
+		- Rolled back UAI change that caused the considerations to be calculated differently.
+
+	[ Game Events ]
+		- Added RequirementInVehicleSDX game events that takes a tag.
+			I don't even know if you can make this call from here. But the script is written.
+
+			<requirement class="InVehicleSDX , SCore">
+				<property name="invert" value="true" />
+				<property name="entity_tags" value="mytags" />
+			</requirement>
+
+Version: 21.1.73.1834
+
+	[ MinEvent ]
+		Added new MinEventActionConverItem ( Completely Untested. Should be okay. Probably. )
+			The intended usage for this is to allow a limited use item that is not connected to the durability,
+			and allows it to change into another item.
+			I didn't even test this one.
+			This MinEvent will add a "MaxUsage" meta data entry using MaxUsage as a starting value.
+			Each time the event is fired on the item, it will count the usage down.
+			Not even joking.
+			When the item is down to 0, it will turn the item into the specified downgradeItem.
+
+		Example:
+			<triggered_effect trigger="onSelfPrimaryActionEnd" action="ConvertItem, SCore" downgradeItem="meleeClub" maxUsage="10" />
+
+	[ UAI ]
+		- Fixed an issue where the UAI considerations were a bit off. Thanks khzmusik
+
+	[ Tools ]
+		- Added Unity Debugging DLLs for Alpha 21.x. Thanks to Yakov.
+
+Version: 21.1.56.1705
+
+	[ Requirements ]
+		Added invert support for RequirementIsBloodMoon.
+			<requirement name="RequirementIsBloodMoonDMT, SCore" invert="true" />
+
+	[ Farming ]
+		- Added an additional check to see if a farm plot is empty.
+		- Updated the UAI Farming Task
+			- Consumes seed items in the inventory now
+			- Resets farm plots after they are all visited, so that the farmer will revisit them
+			- Fixed an issue where Farmers won't tend to a farm plot that you have harvested.
+			- Fixed an issue where the farmer wasn't looking at the plant correctly enough
+			- Fixed an issue where the farmer was too far away from a farm plot to visually have an effect on it.
+		- To help with testing, the farmer will place the smoke particle on the farm plot its currently working on.
+			- This will be removed after some tests are complete.
+
+	[ Bloom's Family Farming ]
+		- Updated the MyFarmer's test entity properties with notrample tag, more UAI, and allow spawns from menu.
+Version: 21.1.55.858
+
+	[ Drop Box Storage ]
+		- Fixed a bug where items were not removed from drop box in multiplayer
+
+	[ Spawn On Death ]
+		Added new Property to allow leaving of the body when spawning a new entity.
+			<property name="SpawnOnDeathLeaveBody" value="true" />
+
+Version: 21.1.53.1324
+	[ Trader Protection ]
+		- Added a new option to allow placing blocks within a Trader Area, under the AdvancedPrefabFeatures ConfigBlock
+			<property name="AllowBuildingInTraderArea" value="false" />
+		- Disable Trader Protection must be set to true, in addition to this setting, to allowing placing of blocks.
+		- Land Claims are still denied from being claimed, to prevent hijacking of a trader by a player.
+
+
+Version: 21.1.52.1544
+	[ Enhanced Signs ]
+		- Fixed hard crash when an invalid URL was used.
+
+Version: 21.1.52.1357
+	[ Food Spoilage ]
+		- Added support for SpoiledItem's value being "None" to skip downgrading the item into something else.
+			<property name="SpoiledItem" value="None" />
+
+Version: 21.1.51.1344
+	[ EntityAliveSDX ]
+		- Re-Added Exp Sharing.
+			- If the Hired NPC has a Player, but the Player does not have a Party, the NPC will share exp directly with that player.
+			- If the Player has a party, the exp will share with the entire party.
+		- Fixed an issue with weapon swapping. 
+
+	[ Broadcast Storage ]
+		- Drop Box(tm) Support
+			- Added the ability to set up a container to be considered a drop box to distribute items to other storage boxes.
+
+			- Any container with the Property "DropBox" with a value of true is handled specially.
+	  			<property name="DropBox" value="true" />
+
+			- Optionally, there is a new block class that can be used.
+				<block name="cntSphereDropBoxTest">
+					<!-- Doesn't need to be signed container, but might make the most sense -->
+					<property name="Extends" value="cntStorageGenericSigned"/>
+					<property name="Class" value="DropBoxContainer, SCore"/>
+					<!-- Default is 100 ticks -->
+					<property name="UpdateTick" value="200" />
+					<!-- Optionally trigger the distribution when the user closes the box -->
+					<property name="DropBox" value="true" />
+					<!-- Optional Distance this box can scan to redistribute. -->
+					<!-- If not defined, the value from AdvancedRecipes's distance is used. -->
+					<property name="Distance" value="30" />
+				</block>
+
+				- Blocks that use the DropBoxContainer class will trigger redistribution at regular intervals, 
+					in case the player makes changes to surrounding boxes.
+
+
+			- When this type of container is closed, it will scan the local TileEntities using the same rules as the Items From Containers for crafting.
+				- Rules include broadcasting is enabled, player is allowed to access, if the container is not opened, and within the distance.
+				- Other containers with the property "DropBox" are ignored as potential targets.
+
+			- It will try to fill any partial stacks.
+			- If existing stacks are full, it will add a new stack to the container.
+			- Any items that cannot be added, either partially or fully, will be left in the DropBox.
+			- If you are adjust your storage containers to add items, the DropBox must be opened, and closed for it to distribute to the new containers.
+
+Version: 21.1.50.839
+	[ Broadcast Storage ]
+		- Removed pre-check cuz I'm dumb, and introduced a free-crafting mechanic.
+
+Version: 21.1.48.1604
+	[ Broadcast Storage ]
+		- Added a few null checks for when player backpack or tool belt may not be available.
+		- Added a pre-check if the player has the required items in their backpack / tool belt, that it'll use those first
+			- Should provide better performance, and protect against the above mentioned null ref.
+
+Version: 21.1.48.955
+	[ Broadcast Storage ]
+		- Fixed another issue where toolbelt items were not being consumed when riding in a vehicle and crafting.
+			- The original code would read the localPlayer's bag and toolbelt slots for items. These were empty.
+			- The fix was to pass the bag and toolbelt from the XUiM_PlayerInventory
+
+Version: 21.1.47.1805
+
+	[ Broadcast Storage ]
+		- Fixed another issue where materials would not be returned upon cancellation when pulled from container
+		- Fixed another issue where crafting would be approved without all the ingredients.
+
+Version: 21.1.39.1623
+
+	[ Water System ]
+		- Fixed an issue where the block's custom description wouldn't show up depending on DisplayInfo
+		- Fixed an issue where water range wasn't being properly used for crops.
+
+Version: 21.1.39.1422
+
+	[ Broadcast Storage ]
+		- Fixed an issue when a cancelling a recipe that had an ingredient with a quality value would result in no returned items.
+
+Version: 21.1.34.952
+
+	[ EntityAlive SDX ( NPCs )]
+		- Fixed an issue where inventory was not being preserved or distributed to clients.
+		- Code clean up on class
+		- Fixed an issue where the NPC could continue to use a weapon that no longer exists in thein loot container.
+
+	[ SCore Integrity Check ]
+		- Added a new feature to SCore's ModEvents.Init() to provide a quick look integrity check.
+
+		Intention:
+			- This checks all the modlets installed locally.
+			- It's intended to be a Quick Look to see if an overhaul is installed correctly.
+			- Each release of an overhaul would have a unique, and repeatable Hash Code.
+			- A Hash Code is a 10 digit numeric code.
+			- If a modlet is added, removed, or is a different version, the Hash Code will be different.
+			- This will not stop a game from loading ( You do you, boo ).
+
+		What It Checks:
+			- This will add new entry's to the game load, printing after the "Loaded Mod:" step.
+			- This will check, and print the path, if there's a Mods folder in the UserDataFolder or local folder.
+			- If there's a mods folder in both, it will display a warning in the log file:
+				WARNING: Loaded Mods From two Folders!
+			- This isn't a fatal warning, but rather helps you at a glance to see if they are potentially loading mods from two different places.
+				- Loading Mods from two locations is not an error, or bug.
+				- Some people install a mod to UserDataFolder / Local Mods folder and forget about it.
+
+			- It will loop around all Loaded Mods, do a GetHashCode() on the Modlet Name and Version number.
+			- GetHashCode() returns an 10 digit numeric code.
+			- All the HashCode for the Loaded Mods are added to a string.
+			- At the end, it will print a GetHashCode() from the combined string, giving a summary.
+		
+		Example:
+			2023-09-02T07:49:59 4.454 INF SCore:: Checking Installed Modlets...
+			2023-09-02T07:49:59 4.454 INF Loaded Mods From C:/Program Files (x86)/Steam/steamapps/common/7 Days To Die/7DaysToDie_Data/../Mods
+			2023-09-02T07:49:59 4.455 INF Modlet List Hash: 1788120558
+			2023-09-02T07:49:59 4.455 INF SCore:: Done Checking Installed Modlets
+		
+	[ UAI ]
+		- Aded the consideration / Task to the VC Proj of SCore
+
+	[ Build Tooling ]
+		- Added a new obj Clean Target to be triggered after "AfterBuild".
+		- This will remove the contents of the obj file after the building / linking.
+		- Any project that loads the Directory.Build.targets file as a reference.
+
+
+Version: 21.1.24.928
+
+	[ EntityEnemySDX ]
+		- Integrated khzmusik's changes
+			- Added a EntityEnemySDX check for an AvatarController Patch
+			- Rebased EntityEnemySDX against EntityHuman
+	
+	[ UAI ]
+		- Integrated khzmusik's changes
+			- Added new Consideration: HasinvestigatePosition
+			- Added UAI Task: ApproachSpotSDX
+			- Cleaned up UAI Task AttackTargetEntity
+	
+Version: 21.1.22.727
+	[ Transmogrifier ]
+		- Moved the crawler gate up a bit, as it was getting random walk types when it really shouldn't have.
+
+Version: 21.1.21.1021
+
+	[ UAI ]
+		- Removed Debug statement for UAIAttackTargetEntity
+
+	[ DecoAoE ]
+		- Added additional code in an attempt to make them quest resets work.
+			- Further updates may be needed
+
+Version: 21.1.20.1053
+	Note: When reference an asset bundle from another modlet, you must use the Name value from the ModInfo.xml
+	For example:
+		<xml>
+		  <Name value="0-SCore_sphereii" />
+		  <Author value="sphereii" />
+		  <Description value="SCore Mod" />
+		  <DisplayName value="0-SCore" />
+		  <Website value="" />
+		  <Version value="21.1.20.945" />
+		</xml>
+
+		<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='FireManagement']/property[@name='FireParticle']/@value">#@modfolder(0-SCore_sphereii):Resources/gupFireParticles.unity3d?gupBeavis06-HeavyLight</set>
+	
+	[ Water System ]
+		- Fixed a possible null ref when reading from a quest-reset
+		- Added a OnBlockLoaded for the sprinkler.
+
+	[ NPCs ]
+		- Disabled a call that created a player party if they hired an NPC, potentially causing other party invites to fail.
+
+	[ UAI ]
+		- Added a + 1 to the y value when doing the IsInside consideration to give it a chance to get out a block or entity to do the check.
+
+	[ Deco Block ]
+		- Added a ischild check for multi-dim blocks
+		- Added a IsTileEntitySavedInPrefab() call to persist in resets
+
+Version: 21.1.16.1542
+
+	[ NPCS ]
+		- Fixed an issue where the NPC wasn't facing at its target
+		- Fixed an issue where a bag drop may throw null ref.
+		- Fixed an issue where the NPC wouldn't turn around to face the target, when backing up.
+
+Version: 21.1.12.1115
+
+	[ NPCs ]
+		- Fixed an issue with a null ref on the read/write for loot containers
+		- Fixed an issue where NPC backpacks weren't preserving on dedi.
+
+Version: 21.1.10.1805  ( For A21.1 stable )
+	[ NPCS ]
+		- Quite a few failed attempts at making inventory persists reliably / weeapon select on respawn
+
+	[ Locks ]
+		- Fixed an issue where players could not lock their own doors.
+
+Version: 21.1.3.950
+	[ NPCs ]
+		- Fixed an issue where the NPCs were not preserving their inventory (for realisies?)
+
+Version: 21.1.1.830
+	[ NPCs ]
+		- Dialog Fixed for the PickMe Up functionality.
+			- Now works on dedicated and single player.
+		- Dialog fixed for weapon swap.
+		- Fixed an issue where NPCs were not preserving their inventory
+		- Fixed an issue where the NPCs were not respawning with the right weapon.
+
+	[ Trader Protection ]
+		- Re-implemented a Remove Trader Protection Patch
+			- Allows compound to be destructive
+			- Traders never close
+			- Zombies can wander into compound, but do not spawn in the compound.
+			- Quests work.
+
+	[ MinEvent ]
+		- Added AnimatorFireTriggerSDX
+		- It will recursively look for all animators on each target, firing the trigger one each animator.
+
+		Example:
+			<triggered_effect trigger="onSelfBuffStart" action="AnimatorFireTriggerSDX, SCore" trigger="triggerName"/>
+
+	[ One Block Crouch ]
+		- Adjusted the crouch adjustment from -0.40 to -.31f. Camera will be slightly higher, but still avoid clipping
+		- Added a safety check to not run if player is in a vehicle.
+
+	[ Power Block ]
+			It allows to use the wire tool anywhere on a MultiDim Block - from ocbMaurice
+			<property name="MultiDimPowerBlock" value="true"/>
+
+Version: 21.0.51.708
+	[ Portals ]
+		- Added all portals to be chunk observers.
+		- Updated the teleport position to be one block above the portal itself.
+
+Version: 21.0.49.1542
+	[ Portals ]
+		- Fixed an issue where portals would error out on game reload, without exiting the game completely.
+
+	[ Documentation ]
+		- Removed documentation to save on space.
+
+Version: 21.0.49.958
+	[ HoldingItemDurability ]
+		- Commented out debug statement
+
+	[ Locks ]
+		- Fixed an issue where cop cars would triggers errors when lock picking, resulting in no loot.
+			- Added a check for LockpickDowngradeBlock property. If it's a non-air block, it will use that downgrade option instead.
+
+	[ Remote Crafting ]
+		- Fixed an issue when a recipe required multiple ingredients, not all ingredients would be consumed.
+
+	[ Caves ]
+		- Flipped the conditional check for the MinThreshold; it does opposite of what it did before.
+
+	[ UAI ]
+		- Merged in changes for the UAI tasks to trigger alert, sense, and give up sounds.
+
+Version: 21.0.46.2014
+	[ EAI ]
+ 		- Remove debug statement
+
+Version: 21.0.46.1832
+
+	[ Remote Crafting ]
+		- Added null checks to items before trying to use their upgrade sound.
+		- Fixed an issue where item dupes were possible.
+			- Items are now removed properly from the backpack, toolbelt, then from Tile entities correctly.
+
+	[ Bugs ]
+		- Fixed an null ref on the animator when playing a game, exiting to main menu, then re-loading.
+		- Fixed a null ref when exiting the game when a drone and hired NPC are available.
+			- This was due to the fact that NPCs were being added as an OwnedByPlayer, and the DroneManager
+				did not consider it would have been a non-vehicle entity.
+	[ Fire Manager ]
+		- Disabled fire manager in prefab editor / play testing worlds.
+
+	[ Better Life ]
+		- Some fixes for the fish swimming are in the SCore, with some modification to the entityclasses.xml
+			- EAI isn't used by fish, so they do not need to be defined.
+
+	[ UAI ]
+		- Updated the IsInFront check to make sure the NPC is facing a target correctl, replacing the old, buggy one.
+
+Version: 21.0.45.1205
+	
+	[ UAI ]
+		- Adjusted the EntityUtilities.Stop() to have an optional parameter: full, default is false.
+			- When a full stop is requred, it will zero out the animator's speed / strafe
+			- Full is triggered when Dialog is open, and when the Idle Task is triggered
+
+	[ Animator ]
+		- Added a postfix to adjust the animator's speed / strafe when dealing with very small numbers.
+
+	[ Better Life ]
+		- Changed MecanimSDX to AvatarAnimalController to fix the animator bug.
+		- Could still be issues
+
+Version: 21.0.42.1007
+	[ Dialog ]
+		- Added new Dialog Requirement For Tag. This will check the listed tags in the value against the NPC you are talking to.
+			<requirement type="HasTag, SCore" requirementtype="Hide" value="zombie" />
+			<requirement type="HasTag, SCore" requirementtype="Hide" value="zombie,human" />
+
+Version: 21.0.41.1943
+
+	[ Remote Crafting ] 
+		- Fixed an issue where items weren't being properly consumed from the backpack / toolbelt.
+
+Version: 21.0.39.859
+
+	[ UAI ]
+		- Fixed an issue where the NPCs would shuffle in place
+		- Fixed an issue where non-hired NPCs wouldn't face you.
+	
+Version: 21.0.38.1508
+
+	[ Caves ]
+		- Added new property to determine when a deep cave threshold would be considered
+				<!-- Spawning and cave decorations would be considered _Deep when at this level or below -->
+				<!-- This setting is used for spawning as well -->
+				<property name="DeepCaveThreshold" vallue="30" />
+		- Added new property to determine how deep the first cave level is from the top
+				<!-- Determines how far below the surface to begin spawning caves. -->
+				<property name="StartCaveThreshold" value="15" />
+		- Added new property to determine minimum terrain height to start generating caves
+				<!-- Default value is -1, no consideration of terrain height -->
+				<property name="MinStartCaveThreshold" value="-1" />
+
+				<!-- If the terrain height is 40, but the threshold is 41, do not generate a cave -->
+				<property name="MinStartCaveThreshold" value="41" />
+
+		- Fixed an issue where the max levels wasn't being respected.
+		
+	[ UAI ]
+		- Cleaned up IdleSDX
+
+Version: 21.0.37.1546
+	[ Caves ]
+		- Fixed an issue where caveAir was used instead of regular air, so decorations weren't being placed.
+		- Added arramus' fixes for the prefabs (thanks!)
+		- Added new property to to the Config Block:
+
+			- This will generate caves in all biomes ( after all the other checks for caves are passed )
+				<property name="AllowedBiomes" value="All" />
+
+			- This will only generate caves in wasteland and pine_rest biomes 
+				<property name="AllowedBiomes" value="wasteland,pine_forest" />
+
+	[ NPCs ]
+		- Expanded the attack angle from -15 and 15 to -30 and 30, to give a wider angle to attack from.
+		
+
+Version: 21.0.30.1335
+	[ Entity Alive Patch ]
+		- Added patch from Zilox to fix the animation issue on animals that do not use root motion, on servers.
+	[ Fixes ]
+		- Fixes for the LootContainer's spawn calls, which have seen a parameter change in A21 b232.
+
+Version: 21.0.28.902
+	[ Remote Crafting ]
+		- Fixed a broken reference to the broadcast button
+
+	[ Food spoilage ]
+		- Integrated khzmusik's food spoilage adaptage to use the ItemValue dictionary.
+			[ This change may be a save-breaking change ]
+
+
+	[ UAI ]
+		- Adjusted the ConsiderationCanSeeTarget to remove the 20 distance change.
+			- This will now use the CanSee Distance from the entity itself.
+		- Code formatting clean up for Wander Task
+
+Version: 21.0.24.1146
+	[ Farming ]
+		- Code moved to Features
+		- Added support for new water system
+		- Added readme.md description its functionality.
+
+	[ Remote Crafting ]
+		- Code moved to Features
+		- Code refactored for clarity
+
+Version: 21.0.22.1422
+
+	Introducing the Features Folder
+		Features folder will contain the harmony and scripts for an isolated feature set, rather than spread across the Harmony and Scripts folder now.
+		This will help with future extraction into seperate DLLs.
+
+	[ Locks ]
+		- Fixed Unity crash when pick locking doors. 
+				- Sound was trying to play on a non-main thread.
+		- Code moved to Features
+
+	[ Fire Manager ]
+		- Modified the Walk On Fire trigger to fire off the block, rather than the entity.
+		- Code moved to Features
+		- Added documentation to the Features/Fire/Readme.md
+
+Version: 21.0.21.1610
+	[ Broadcast Feature ]
+		- Fixed an issue where the game would allow you to craft if you had a single ingredient.
+	
+	[ UAI ]
+		- Fixed an issue where the NPC would not face you when following
+		- Added a rotation of 90f in the TaskMoveToTargetSDX for when the entity is blocked.
+
+	[ NPCs ]
+		- Added yet another fix to the jumping.
+
+Version: 21.0.20.1553
+	[ Dialog ]
+		- Added a toolbar / bag search for the NPCHasItemSDX Condition
+
+	[ NPC ]
+		- Fixed an issue where the NPC would stare at a dead body
+		- Added the ability to add items directly into the NPC's private bag slot, defined in the entityclass.
+			<property name="BagItems" value="itemMeleeStoneAxe" />
+			<property name="BagItems" value="itemMeleeStoneAxe, foodWater=2" />
+		- If the leader has the cvar "quietNPC" set, the hired NPCs will not make foot steps.
+		- Added Shared EXP, so hired NPCs will share their exp with you, and the party members.
+		- Fixed a few issues with angles
+		- Fixed shared exp with party
+		- Fixed issue where dead zombies stayed standing
+		
+	[ Broadcast Storage ]
+		- Added FuriousRamsay's suggestion to filter button when in entity or vehicle.
+
+	[ Console Command ]
+		- Created a new console command to set cvar's on the player.
+			setcvar <cvarName> <cvarValue>
+
+		- To Remove a cvar, set it to 0
+			setcvar <cvarName> 0  
+
+		Example:
+			setcvar quietNPC 1  
+			setcvar FailOnDistanceToLeader 10
+
+	[ UAI ]
+		- Updated the FailOnDistanceToLeader consideration to check the distance of the target entity, to see if the entity is outside of the allowed range.
+			- This should prevent the NPC from walking halfway to a zombie, then turning around, as it'd take it out of this range.
+		- Updated the FaceToEntity code to try to look at the player a bit more often.
+		- When the NPC starts the Follow Task, it will clear its attack / revenge targets, as not to obsess over them.
+		- Adjusted the yaw and pitch of NPCs to be 8f,8f, which should line them up better. 
+Version 21.0.15.1058
+	[ Upgrade log ]
+		- Updated all XMLAttributes to XAttributes. Gosh
+		- Removed QuestTags and converted over to FastTags
+		- Oh geeze, XMLAttributes are everywhere
+
+	[ Dialog ]
+		Added a DialogActionSwapWeapon to allow a NPC to change weapon
+			<action type="SwapWeapon, SCore" id="gunNPCPipeShotgun"  />
+		Added DialogActionAnimatorSet to change parameter.
+			<action type="AnimatorSet, SCore" id="PistolUser" value="0" />
+		Added a DialogActionRemoveBuffNPCSDX to remove a buff from a NPC
+			<action type="RemoveBuffNPCSDX, SCore" id="PistolUser" />
+		Added a DialogActionPickUpNPC, allowing you to pick up an NPC as an Item
+			<action type="PickUpNPC, SCore" />
+			- Item is hard coded, and defined in SCore's items.xml
+		Added A DialogActionDisplayInfo to dump the NPCs Buffs and CVars to thelog file.
+			<action type="DisplayInfo, SCore" />
+
+		Reminder: Console command  dialog   or dialogs    will reload dialogs.xml without restarting the game.
+
+	[ EntityAlive SDX ]
+		Added New Feature to allow NPCs to change weapons on the fly.
+		Added a UpdateWeapon( item ) call to allow an NPC to change weapons
+		Added PickUp NPC option.
+			- This preserves ownership and name of Entity.
+			- Entity gets created into an items.xml entry (defined in SCore's Items.xml
+		Re-added Progression for NPCs under the following conditions:
+			- If they are EntityAliveSDX
+			- If they do not hava a cvar called "noprogression" with a value greater than 0
+			- if they do not have a tag called "noprogression"
+		Fixed an issue where the PhysicsTransform was not active, allowing NPCs to clip inside of each other.
+
+	[ MinEvent ]
+		Added MinEventActionAnimatorSetFloatSDX
+		Added MinEventActionAnimatorSetIntSDX
+			- Triggers as UpdateInt / UpdateFloat on the animator, updating the parameter with the supplied value.
+			- If the value starts with a @, the cvar value will be used.
+			Example:
+				<triggered_effect trigger="onSelfBuffUpdate" action="AnimatorSetIntSDX, SCore" property="HoldType" value="@WeaponType" duration="1" /> 
+		Added MinActionSwapWeapon
+			Causes the NPC to have the specified Item.
+			Example:
+				<triggered_effect trigger="onSelfBuffUpdate" action="SwapWeapon, SCore" item="meleeClub" />
+
+	[ Entity Player ]
+		Fixed One Block Crouch to prevent clipping in terrain.
+
+	[ Winter Project Snow ]
+		- Fixed an issue where terrain was bumpy around POIs when buried in snow ( Winter Project Only )
+		- Fixed an issue with snow material that caused collapses.
+
+	[ Caves ]
+		- Added Pillars from bedrock to strengthen POIs weakened SI
+
+	[ Lock Picking ]
+		- Fixed a hard crash when trying to access Progression
+
+	[ Fire Manager ]
+		- Added the ability to specify on a per block basis the chance to extinguish itself.
+			<property name="ChanceToExtinguish" value="0.05" /> <!-- 5% chance to exintguish -->
+		Note: This is checked per block, per CheckInterval.
+
+Version: 20.6.471.1518
+	[ Quest Utils ]
+		- Uncommented code that was accidentally commented out.
+
+Version: 20.6.470.1151
+
+	[ Quests / Entity Targetting ]
+		- Merged in a bug fix for khzmusik.
+
+		The revenge targets were being set on all entities in bounds, including the player hires. 
+		This is now fixed, and in addition the revenge targets also will not be set on other players in the party, 
+			provided those players are protected from friendly fire.
+
+		To detect whether an entity is an ally of the player's party, I created a new IsAllyOfParty method in EntityTargetingUtilities. 
+		I did not change any existing methods so there should be no risk of breaking anything.
+
+		I also fixed an issue where the POI's full area was not covered (the Bounds constructor shrinks the size vector 
+			argument in half so only a quarter of the prefab was covered).
+
+	[ MinEvent ] 
+		-Added a MinEvent to attach scripts to entity transforms.
+		- Note: This should not be used yet. I've added it for xyth's testing for getting zombies to create foot prints in the snow.
+
+		Example:
+			<effect_group>
+				<triggered_effect trigger="onSelfFirstSpawn" 
+					action="AddScriptToTransform, SCore" 
+					transform="RightFoot"    // The Game Object's Name to target.
+					script="GlobalSnowEffect.GlobalSnowCollisionDetector, SphereII_Winter_Project"  // The script you want to attach:  Namespace.Script, Assembly
+				/>
+				<triggered_effect trigger="onSelfFirstSpawn" action="AddScriptToTransform, SCore" transform="LeftFoot" script="GlobalSnowEffect.GlobalSnowCollisionDetector, SphereII_Winter_Project"/>
+			</effect_group>
+
+Version:  20.6.467.917
+
+	[ Quests ]
+		- Merged khzmusik's new Quest Action.
+
+			This quest objective sets the revenge targets of all entities in range.
+
+			<action type="SetRevengeTargetsSDX" id="party" value="location" phase="2" />
+
+	[ Lock Pick ]
+		- Adjusted MaxGiveAmount to be 2 * the perk level
+
+	[ Music Boxes ]
+		- Reformatted, and refactored
+
+	[ IsActive ]
+		- Fixed some issues with the TileEntity AlwaysActive
+		- Re-enabled full Winter-Project support
+
+	[ Inert ]
+		- When an entity is inert, the entity is paused. No animations, no sound, no attacks, and takes no damage.
+		- When an entity has the following property, it will only be active at night. Otherwise, it'll be considered inert.
+		      <property name="EntityActiveWhen" value="night" /> <!-- alternative is day -->
+		- Added a check for TargetIsAlive if the entity is Inert or not. If it is, it's ignored.
+		- Added checks for IsEnemyNearby, and CanSeeTarget to do Inert checks.
+		- Added patches so inert entities will not make a sound.
+
+	[ Fire Manager ]
+		- Tagged Material: Mhay to be flammable.
+		- Re-factored FireManager to be clearer.
+		- Added some performance tweaks:
+			- Sound will not always play on each fire block. Instead, each block will have a random chance to either play a sound or not. (10% chance to play a sound)
+			- Added 5% chance for a block to self-extinguish.	
+			- These checks are re-evaluable on the CheckInterval time.
+		- Added a check for Explosion.
+			- If a block has an explosion property, and is set as flammable, the block will trigger an explosion when it downgrades.
+		
+	[ Explosion Particles ]
+		- The vanilla prefabExplosions array that maintains a list of possible explosion particles via the Explosion.ParticleIndex is set to 20.
+		- When a game starts, the SCore will check it's ConfigurationBlock's ExternalParticles node for external particles.
+			Example:
+				<property class="ExternalParticles">
+					<!-- The name is not used by the system. The index value will be displayed in the log during a game boot up. -->
+					<!-- Review the log to find out your index. -->
+					<!-- The Index is a GetHashCode() on the value. -->
+					<property name="SmokeParticle" value="#@modfolder:Resources/PathSmoke.unity3d?P_PathSmoke_X" />
+					<property name="FireParticle" value="#@modfolder:Resources/gupFireParticles.unity3d?gupBeavis05-Heavy" /> 
+				</property>
+
+		- If a particle entry is detected, this particle will be registered with the main ParticleEffect.RegisterBundleParticleEffect.
+			- This is the same particle effect that is used elsewhere in the system, including the Fire Manager.
+		- The index of this particle will be the bundle's GetHashCode(). 
+			- This value can be viewed in the log file:
+				Registering External Particle: Index: -87591912 for #@modfolder(0-SCore):Resources/PathSmoke.unity3d?P_PathSmoke_X
+
+			- This index is what you should use in your Explosion.ParticleIndex.
+				<property name="Explosion.ParticleIndex" value="-87591912"/> 
+
+		- This check is applied via a Harmony patch to GameManager's ExplosionClient, and will be triggered if the ParticleIndex is not within a range of 0 and 20.
+
+		- Append to SCore's ConfigurationBlock's ExternalParticles Entry.
+		
+
+Version: 20.6.453.1912
+
+	[ Effect Group Requirement ]
+		- Fixed a bug where it just didn't work.
+
+		Tested Configuration, other combinations may work:
+
+			<effect_group name="RETURN BROKEN">
+				<triggered_effect trigger="onSelfPrimaryActionStart" action="CreateItemSDX, SCore" item="resourceBone" >
+					<requirement name="HoldingItemDurability, SCore" operation="Equals" value=".1"/>
+				</triggered_effect>
+			</effect_group>
+
+	[ Fire Manager ]
+		- No code change, however wanted to say that the SetLightOff was moved from the GameUpdate loop, and moved behind the check interval.
+		- Performance increase potential.
+
+Version: 20.6.453.1540
+
+	[ Fire Spread ]
+		- New property in Config/blocks.xml.
+		- If FireSpread is false, fire will not spread to neighboring blocks.
+		- Default is true, fire will spread.
+
+	[ EntityAliveSDX ]
+		- Merged in FuriousRamsay's changes
+			- Remove the colliders on death, so you can keep bodies around afterwards
+			- Added lootable corpses.
+
+	[ Spook Theme ]
+		- Fixed an issue where Spook wasn't spookie. Effects easier to tell at night.
+
+
+	[ Effect Group Requirements ]
+		- Added a new Requirement, meant to be used in the effect_group / triggered events.
+		- Note: This is completely untested.
+	
+			<!-- True when the item is 100% broken -->
+		 	<requirement name="HoldingItemDurability, SCore" value="1"/>
+
+			<!-- True when the item is 50% broken -->
+		 	<requirement name="HoldingItemDurability, SCore" value="0.5"/>
+
+		Example on an items.xml reference:
+			<effect_group name="Check For Broken" >
+				<requirement name="HoldingItemDurability, SCore" value="1"/>
+				<triggered_effect trigger="onSelfSecondaryActionStart" action="CreateItemSDX, SCore" item="whatever" />
+			</effect_group>
+
+
+Version: 20.6.442.1932
+
+	[ Food Spoilage ]
+		- Added an additional check for PreserveBonus -99 to not spoil when taken out.
+
+	[ Lock Picking ]
+		- If keyboard is not detected as the primary input device (ie, a controller is), then disable the lock mini game, and fall back to vanilla
+		
+		- Added a cvar check to fall back to regular lock picking
+			- If the player has the cvar LegacyLockPick  of greater value than 0, default lock picking will be used, skipping the mini-game.
+
+	[ MinEffect ]
+		Added Soleil Plein's new Console command that executes commands and passes cvar values to it.
+			<triggered_effect trigger = "onSelfBuffStart" action = "ExecuteConsoleCommandCVars, SCore" command = "testCommand {0} {1}" cvars = "cvar1,cvar2" />
+
+	[ Encumbrance ]
+		- Needed a way to re-calculate the encumbrance when the cvar for max encumbrance triggers.
+		- Not many good ways came to me for this, so I wrote a MinEffect. This will recalculate the encumbrance values.
+
+			<triggered_effect trigger = "onSelfBuffStart" action = "RecalculateEncumbrance, SCore"  />
+
+	[ Legacy Distance Terrain ]
+		- Disable Legacy Distant Terrain in GameModeEditWorld mode due to reported lag.
+
+Version: 20.6.247.845
+	[ Vehicle No Pick Up ]
+		- Fixed spelling error in NoVehicleTake.cs
+			- Left old name as an empty, mispelled file to be removed for A21... if I remember.
+
+	[ Farming ]
+		- Added property check for Direct Water Source.
+			<property name="WaterType" value="Unlimited" />
+		- Any block with that set will be an unlimited water source, and will not take damage from crops.
+		- Add to bedrock, or any other block you want.
+
+	[ Quests ]
+		- ObjectiveBuffSDX now displays the localized name_key for the buff.
+
+Version: 20.6.422.831
+
+	[ Vehicle No Pick Up ]
+		- Fixed a bug where removing the "take" option just shifted the index, not remove the functionality.
+
+		- Added a few filtering options, allowing modders to fine tune which vehicles can be picked up or not. 
+		- The follow conditions allow for vehicle pick up, listed by the order in which they are evaluated, if the feature is enabeld in the Config Block's VehicleNoTake
+			- If the vehicle has the tag: takeable
+			- If the Player has the cvar: {EntityVehicleName}_pickup, and this value is greater than 0.  
+				Example:     vehicleBicycle_pickup = 1
+			- If the Player has the cvar: PickUpAllVehicles, and this value is greater than 0.
+		- In all other cases, the vehicle's "take" command will be disabled.
+
+
+
+Version: 20.6.420.840
+	
+	[ Encumbrance ]
+		- Added a check that for block weight.
+			- Previous was only checking if the Item entry had a weight.
+			- Now checking ItemWeight, and if not found, will check the Block weight.
+			- If both item and block has different weight, the Item weight will take priority
+
+	[ Repair From Container ]
+		- Fixed the issue where the tool belt items were not being consumed.
+		- Activated original Repair Block code. Code was not added to project and not built.
+			- Disabled my own crummy implementation which was causing more bugs.
+
+
+Version: 20.6.416.1123
+
+	[ MinEvent ]
+		Added MinEventActionSetDateToCVar
+			This will set the Current Day to the CVAR $CurrentDay.
+
+			Example: 
+				<triggered_effect trigger="onSelfBuffStart" action="SetDateToCVar, SCore" target="self"/> 
+
+				CVar $CurrentDay will have the current game day.
+
+		
+	[ Farming ]
+		- Added debug information to water pipes, farm plots, and crops.
+			- If the player holds down the "Activate" key, it will display the information about water.
+
+			- Ie: holding down <E> by default will show information about some blocks.
+
+		- Adjusted the way that the Farming Task extracts Harvest / Items
+
+			Seeds:
+				- The first planted*1 item it finds will be the seed which is replanted.
+
+				Example:
+					<drop event="Destroy" name="plantedBlueberry1" count="1" prob="0.5"/>
+
+				- All planted*1 items will be removed from the harvest / destroy lists.
+				- The Farming Task will generate a new item to be used for planting.
+
+			Harvest:
+				- By default, all harvesting will continue as expected. 
+				- If the NPC has a cvar for the Harvest item, it will set the min and max count to that value.
+		
+				Example:
+					If MyFarmer has a cvar called "foodCropBlueberries", with a value of 5, MyFarmer will get 5 blueberries from each harvest,
+						regardless of prob or min / max count defined in the Harvest line.
+
+		- Adjusted Farming Task Scanning to include tending to wilted plants.
+
+		- Updated BlockWaterSourceSDX to be able to supply unlimited water, without requiring a water block itself, or doing damage.
+
+			<property name="WaterType" value="Unlimited" />
+
+			Default is limited, and is equivalent to 
+				<property name="WaterType" value="Limited" />
+
+		- The above property can also be applied to a BlockLiquidv2, and will have the same effect.
+			Default is limited.
+		
+
+Version: 20.6.414.1626
+	[ Farming ]
+		- Fixed a bug where the Farmer would not see FarmPlots
+			- The BlockFarmPlosSDX was not setting IsNotifyOnLoadUnload to true, thus it was not registering being loaded and unloaded.
+
+	[ Encumbrance ]
+		- Fixed a bug where the encumbrance of equipment was not being done correctly
+
+Version: 20.6.413.1556
+
+	[ Craft / Repair From Containers ]
+		- Adjusted permission for Broadcast feature to allow members of the same party to access locked containers.
+
+
+Version: 20.6.412.1907
+
+	[ Craft / Repair From Containers ]
+		- Rolled back a fix when count of items were doubled.
+			- Seems this fixes it for some containers, but for others, it displays no items.
+
+	[ Fire Manager ]
+		- Integrated FuriousRamsay's fix for the MinEffectAddFireDamage.
+			- In some cases, a melee weapon will set fire to contents on the other side of a wall or door, if the ray cast went through the block.
+
+	[ Farming ]
+		- Fixed an issue where a water plant was doing damage to a sprinkler, instead of water block
+		- Added an additional scan for UAITaskFarming to do a wider scan if it doesn't find anything interesting.
+
+Version: 20.6.409.1626
+
+	[ Craft / Repair From Containers ]	
+		- If a container is open, do not include the contents in the broadcast scan.
+
+	[ Farming ]
+		- Fixed an issue where a Plant could not consume water from the water, through the sprinkler.
+		- Added a fix to help improve Farmer to reach corner farm plots
+		- If a PlantGrowingSDX block has a PlantGrowing.Wilt, it will flag the plant to wilt if there's no water
+
+		- Added new Config Block Entry called WaterParticle on CropManagement node.
+
+			- When a plant consumes water, this particle will be applied.
+			- When a plant is first planted, this particle will be applied.
+			- Default particle in Bloom's Family Farming is from Guppycur. 
+				It will run for 5 seconds, then stop looping.
+				The particle is not removed until the plant is removed.
+
+			Default: 
+				<property name="WaterParticle" value="NoParticle" />
+
+			Bloom's Family Farming XPath:
+				<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='CropManagement']/property[@name='WaterParticle']/@value">#@modfolder:Resources/guppyFountainDisplay.unity3d?gupFountainDisplay</set>
+			
+			- Each Plant can over-ride the particle at the block level, using the same property. 
+				<!-- No particle for this particular plant -->
+				<property name="WaterParticle" value="NoParticle" />
+
+Version: 20.6.408.1442
+
+	[ Craft From Containers 
+		- Fixed an issue where craft / repair from containers was checking tool belt, then containers. 
+			It was checking to see if the item was in the backpack, but not consuming it.
+
+
+Version: 20.6.408.1121
+
+	[ Craft From Containers ]
+		- Fixed an issue where GetItemCount() patch was searching for ingredients twice, resulting in mis-reporting (2x amount actually available )
+
+	[ Encumbrance ]
+		- Added basic encumbrance.
+		- Encumbrance check fires when something is added / removed from back pack, toolbelt, and equipment.
+		- Once encumbrance is calculated, it's total value is added to a cvar, specified in the Config block. By default, this is encumbranceCVar.
+		- The value of the cvar is based on percent.  When set to 1f, the player is considered at MaxEncumbrance. 
+			- A value of 1.5 means the player is considered to b e 50% over encumbered.
+		- Maximum Encumbrance is read from the Config Block. However, if the CVar "MaxEncumbrance" is set, it will use that value instead.
+			- If Max Encumrabrance drops below 0, it will be reset to the Config Block Entry.
+			- The CVar will not be reset, only the value being used to perform the calculation.
+
+		- New configuration options added to SCore's Config block
+				<!-- Enables item weight encumbrance on the Player bag -->
+				<property name="Encumbrance" value="false" />
+
+				<!-- how much encumbrance before "max" threshold is set, and penalties are incurred. -->
+				<property name="MaxEncumbrance" value="10000" />
+
+				<!-- This cvar value will be placed on the player and will be a percentage of encumbrance. -->
+				<!-- 1f = at max encumbrance. 1.5, 50% over encumbrance -->
+				<property name="EncumbranceCVar" value="encumbranceCVar" />
+				
+				<!-- Include Tool belt? -->
+				<property name="Encumbrance_ToolBelt" value="false" />
+				
+				<!-- Include equipment ? -->
+				<property name="Encumbrance_Equipment" value="false" />
+				
+				<!-- Each item that does not have a ItemWeight property will be weighed at this value. -->
+				<property name="MinimumWeight" value="0.1" />
+
+
+			Recommend XPath:
+				<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='AdvancedPlayerFeatures']/property[@name='Encumbrance']/@value">true</set>
+				<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='AdvancedPlayerFeatures']/property[@name='Encumbrance_ToolBelt']/@value">true</set>
+				<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='AdvancedPlayerFeatures']/property[@name='Encumbrance_Equipment']/@value">true</set>
+				<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='AdvancedPlayerFeatures']/property[@name='MinimumWeight']/@value">1</set>
+
+		- Each item can have a property called ItemWeight which will over-ride the MinimumWeight from the SCore's block's entry.
+				<property name="ItemWeight" value="10" />
+
+		- ItemWeight can be 0, and can also be negative numbers.
+
+
+
+	[ Farming ]
+		- Fixed a bug where a water sprinkler was acting as an independent water source. 
+			-> Water sprinkler is now checking to see if its connected to a valid water source
+		- Fixed an issue where crops could be planted after a sprinkler was removed, and the area was no longer watered.
+		- Added debug information on pipes to show water source, and how much water is left.
+		- Added a Custom description for BlockPlantGrowing to show water information. This is for testing purposes.
+				<property name="DisplayInfo" value="Custom"/>
+		- Fixed an issue where Farmer would get bored and do nothing.
+
+
+Version:  20.6.405.854
+	[ Farming ]
+		- Fixed a bug where the water range check was incorrectly using the water range of air, rather than the plant.
+
+Version: 20.6.403.1003
+
+	[ Farming ]
+		- Fixed an issue where the sprinkler blocks were not registering themselves to the Valve System.
+			- Plants will check all valves ( sprinklers ) for their water range, then calculate if its within range of the valve.
+			- If there are no valves within range, plant will check for surrounding blocks for water.
+
+
+Version: 20.6.403.2043
+
+	[ Broadcast Feature ]
+		- Added code for Repair / Upgrade from storage
+		- Added check to see if enemy was nearby for Repair / Upgrade from storage
+
+	[ UAI Farming Task ]
+		- Moved seed decrements from UAI Task to the Manage method, to more accurately subtrack seed usage.
+		- Added water check to see if NPC can actually plant at the location.
+		- Added a Water Valve Check
+			- When a water block will scan for a water source, it'll check all the valves registered, and check if the plant is within range of the water block's water range
+			- In order for this water valve to be registered, it must be on. Just having a water valve that is not on, will not be sufficient for plant needs.
+					- This is different behaviour than using a regular non-valve water source.
+			- If the original valve is off when a plant checks, it will look for other valves to see if there's any water available on them.
+			- If none are found, it'll resort to legacy behaviour, and scan for water sources.
+
+			- BlockWaterSourceSDX has a new property. Default is 5f.
+				<property name="WaterRange" value="5" />
+
+
+	[ Trample Code ]
+		- Entities that have "notrample" cvar value greater than 0, will not cause crops to be damaged, if the crops damaged feature is enabled.
+		- Entities that have a "notrample" tag will not cause crops to be damaged.
+
+	[ Quest ]
+		- Added Localization support.
+			ObjectiveBuffSDX_keyword  ( fall back is ObjectiveBuff_keyword, which is simply Get in English )
+			<buff> If the buff name has a localization setting, it'll use that, in conjunaction with the keyword  Get <my buff>
+
+Version: 20.6.381.1359
+
+	[ Merge from khzmusik ]
+			- Fixed a null ref when an NPC would shoot a drone.
+
+			- Enhanced support for NPC Guard
+
+			The Guard command, when issued from a pathing cube, sets the NPC order to Guard. Since it is not issued by the NPCs leader or owner, the guard position is set to (exactly) where the NPC is standing.
+
+			This is different from the "GuardHere" response (aka "Stay where I am standing") in the hired NPC dialog menu. That dialog response sets the current order to Stay, and since it is issued by a player, 
+				the guard position is set to the center of the block where the player is standing.
+
+			This is all done by buffs. The buff from the pathing cube was already named "buffOrderGuard" in the C# code, but there was never a buff by that name in buffs.xml. So, I created a new buff for use by that code.
+
+			The buff used by the dialogs was "buffOrderGuardHere", which matched an existing buff in buffs.xml. That buff is unchanged.
+
+			Because the order is Guard, any NPC Core utility AI tasks that will not fire when the order is Stay, will still fire. This means NPCs will still run after enemies, reload, etc.
+
+			In order to have them stay where they are when initially spawned in, and return to their guard positions after they're done attacking enemies, a new AI task will need to be 
+				added in utilityai.xml. But this is not done in SCore.
+
+			No existing behavior should be affected by these changes; only POIs that have pathing cubes with "task=guard" will need these changes, and to my knowledge nobody is doing that.
+
+
+Version: 20.6.368.1433
+
+	[ Food Spoilage ]
+		- Fixed an issue with -99 not stopping spoilage when using PreserveBonus -99
+
+	[ RandomDeathSpawn ]
+		Bug Report #61:	Wrong spawns on multiplayer of "Burn Victim" #61 (https://github.com/SphereII/SphereII.Mods/issues/61 )
+			- Added isEntityRemote check before determine to spawn or not.
+
+	[ ObjectiveBlockDestroySDX ]
+		Added a NetPackage to help distribute the block being destroyed count to the party for shared accumulation
+
+	[ Fire Manager ]
+		- Disabled the extinguished check to see if a block has been flagged as extinguished or not.
+		- Added a check where extinguished removed a block from the fire map.
+		- New functionality is that each time a block is extinguished, it'll set the expired time, regardless if it's already in the list, counting down.
+			- If BlockA was extinguished, it can smoke for 20 seconds.
+			- After 20 seconds, BlockA can catch fire again.
+			- If BlockA is re-extinguished before the 20 seconds are past, expired time will be set back to 20.
+
+		- Old functionality is that each time a block is extinguished, it'll expire after the expired time, allowing it to re-ignite.
+			- If BlockA was extinguished, it can smoke for 20 seconds.
+			- After 20 seconds, BlockA can catch fire again.
+			- If BlockA is re-extinguished before the 20 seconds are past, it won't reset that time period.
+			
+
+Version: 20.6.297.1109
+
+	[ Enitity Alive SDX ]
+		- changes by kgiesing
+		
+		- With these changes, both EntityAliveSDX and EntityEnemySDX will implement that interface. 
+			- This should allow EntityEnemySDX to behave similarly to EntityAliveSDX
+
+			- This creates a new interface named IEntityOrderReceiverSDX, which should be used on any entity that can accept orders.
+
+			- Also, order-related blocks, MinEvents, and AI tasks are updated to use the interface type, rather than EntityAliveSDX directly.
+
+Version: 20.6.295.807
+
+	[ Broadcast Manager ]
+
+	- possible fix for Broadcastmanager not saving on Multiplayer games : by FuriousRamsay
+
+Version: 20.6.285.831
+
+	[ Broadcast Manager ]
+
+	- Broadcastmanager will now save and cleanup on exiting
+
+	- It should now be possible to broadcast from storages put down by other players
+		(storage must be locked if you don't want other players be able to remote craft from your storage)
+	
+	- Changed Button code for better support in custom UIs.
+	
+	[ Remote Crafting / Repairs ]
+	
+	- added remote repair/upgrade on  blocks by FuriousRamsay
+	- added blocking repair/upgrade when enemies nearby
+
+
+Version: 20.6.259.937
+
+	[ BlockClockDMT ]
+		- added in BlockClockDMT, which gives a working clock, updating an animator on the unity object every hour.
+		      <property name="Class" value="ClockDMT, SCore"/>
+
+	[ Spawn On Death ]
+		- Commented out code that would destroy the gore block, which may not be relevant anymore.
+
+	[ Remote Crafting ]
+		- Solved bug where broadcast button was not being hidden when broadcastmanager was disabled
+
+Version: 20.6.250.1020
+
+	[ Fire Manager ]
+		- Fixed a potential null ref when the fire check is firing before the game is fully loaded.
+
+Version: 20.6.249.1333
+
+	[ Random Death Spawn ]
+		- Updated spawn code to reflect the changes from SpawnEntity MinEffect to avoid duplicating entities
+
+	[ Linux Fixes ]
+		- Fixed null reference errors when running on Linux client for crop trample and IsAlwaysActive
+
+Version: 20.6.247.1047
+
+	[ Entity Stats ]
+		Using patch from haidr'gna.  Sets cvars on the character that contains the current rain fall, current snow fall, and current cloud percent
+
+		CVar:
+			_sc_rain
+			_sc_snow
+			_sc_cloud
+
+		    __instance.Entity.Buffs.SetCustomVar("_sc_rain", rain, true);
+            __instance.Entity.Buffs.SetCustomVar("_sc_snow", snow, true);
+            __instance.Entity.Buffs.SetCustomVar("_sc_cloud", cloud, true);
+
+	[ Fire Manager ]
+		
+		- If an entity has a property set for SpreadFire set to false, an explosion from it will not spread the fire.
+			<property name="SpreadFire" value="false" />
+
+		- If an entity has a cvar called SpreadFire, and is set to -1, an explosion from it will not spread the fire.
+
+		- Commented out OnEntityWalkingPatchFire, as I believe UpdateCurrentPositionAndValue patch is sufficient to catch an entity on fire.
+
+	[ Block Utilities ]
+		- Added a check to not add particles if the system is on a dedicated server
+
+
+Version: 20.6.242.1151
+
+	[ Cave Manager ]
+		- Adjusted math for Heigh map
+
+Version: 20.6.240.913
+
+	[ Fire Manager ]
+		- Potential fix for stack error on Linux
+
+	[ Cave Manager ]
+		- Adjusted math for HeightMap mode
+		- Added new default height map as cave1.png.
+
+Version: 20.6.238.1937
+
+	[ Cave System ]
+		- Initial implementation of Heighmap cave system.
+		- Samples under 0-SCore/Caves/Stamps
+		- To enable Height Map Caves using xpath:
+
+			<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='CaveConfiguration']/property[@name='CaveEnabled']/@value">true</set>
+			<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='CaveConfiguration']/property[@name='GenerationType']/@value">HeightMap</set>
+			<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='CaveConfiguration']/property[@name='CavePath']/@value">@modfolder:/Caves/Stamps/cave11.png</set>
+			<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='CaveConfiguration']/property[@name='CavePrefab']/@value">Large</set>
+
+		- Default is cave11.png
+
+		- Teleport to 0 0, then look for underground. The top corner of your target png is currently set to 0,0
+			-> You can also look at the log for:
+				Cave Teleport: 
+
+				This will give you the coordinates to teleport to. Example:
+					Cave Teleport: 57 0
+
+					teleport 57 0
+
+		- Log file is kind of spammy.
+			- During initial load up, it will display lines of numbers for the cave mapping as the system sees it.
+			- When a cave is being drawn, it'll display Target Depth.
+
+		- The CavePrefabs placeholders are currently defined as follows:
+			Large:  3x4x3 block of air
+			Medium: roughly 3x1x3
+			Small:	1x1x1
+
+			- This will be fleshed out more, but this is what you can start off with. I don't find Medium and Small very useful, but your heightmaps may need adjustments
+
+
+Version: 20.6.238.1305
+
+	[ Fire Manager ]
+		- Updated two Harmony patches that give buffs to check if the block is on fire and has a particle.
+
+	[ Random Death Spawn ]
+		- Removed blocking Check:
+			if (__instance.Buffs.HasCustomVar("NoSpawnOnDeath")) return true ;
+		
+			- Added another line of guppy code to prevent spawns:
+			if (strSpawnGroup == "SpawnNothing") return true;
+
+		- Resynced Guppycur's changes
+
+		- If an entity has a custom cvar called RandomSize, and a custom cvar called SpawnCopyScale, the newly spawned entity will spawn with the same scale as the original
+
+	[ UMA ]
+		- Brought forward some UMA patches that are disabled by default; toggle in Config/blocks.xml
+			-> If UMAs are set to type="Zombie", create the Data/UMATextures Folder
+				-> If UMATweaks is enabled, this folder is created when a type is Zombie.
+			-> If UMAs are set to type="Player", you do not need a Data/UMATextures folder
+
+Version: 20.6.235.1604
+
+	[ ObjectiveBlockDestroySDX ]
+		-> Added support for a comma-delimited list for the block names that are valid.
+			<objective type="BlockDestroySDX, SCore" id="woodChair1,officeChair01VariantHelper,woodChair1Broken" value="1" phase="2"/>
+		
+		-> Added support for comma-delimited list of tags. If the objective's ID does not match any known block, the objective will assume the id is a potential comma-delimited list of tags.
+			<objective type="BlockDestroySDX, SCore" id="ore,deepOre" value="1" phase="2"/>
+
+		-> Note: Order of checks is: comma-delimited block name, block name, comma-delimited tag. This is important because some tags will match a block name (terrGravel, wha u doin')
+
+		-> Note: Count is unified, so a woodChair1 and woodChair1Broken counts as 2 towards this objective 
+
+	[ XUI Menu ]
+		-> Added a Config/XUi_Menu/windows-Template.xm to expose over-ride options using w00kie n00kie's Custom Game Option mod: https://gitlab.com/wookienookie/CustomGameOptions.git
+			-> other settings can be exposed with just XML settings. Some documentation exists in the windows.xml on how to map the settings to the xui.
+			-> This file is just a template file. Using it as-is is NOT recommended, as it will not display properply.
+		-> This is an optional feature that will not work without the CustomGameOptions.
+
+Version: 20.6.234.911
+
+	[ EntityAlive Patch ]
+		- Added a chunk of Guppycode I missed
+
+	[ SpawnCubeSDX ]
+		- If the keep variable is on the Config line (the value does not matter.. keep=0), then it will not self-destroy
+			-> When keep is available, it'll set a scheduled update into the future.
+
+	[ Entity Swimming ]
+		- Fixed an issue where fish were outside of water
+
+	[ A Better Life ]
+		- Adjusted spawn rate in the biomes.xml for fish spawns.
+
+Version: 20.6.233.1938
+
+	[ Entity Alive Patch ]
+		- Added new cvar check to disable SpawnOnDeath
+			-> If a particular entity has a cvar called: NoSpawnOnDeath, then it will skip the SpawnOnDeath
+
+	[ Headshot Only Patch ]
+		- Fixed typos
+
+	[ Fire Manager ]
+		- If SmokeTime is set to 0 or below, no smoke will be placed.
+
+	[ 0-SCore Development ]
+		- Re-visited AssemblyInfo.tt and fixed up a issues, simplyfing it and adding leading 0s
+
+	[ SpawnCubeSDX ]
+		- Added new property called keep=0. This will keep the spawn block from destorying itself, which was affecting water spawned entities.
+
+		<block name="terrWaterSpawner">
+		  <property name="Extends" value="SpawnCube"/>
+		  <property name="Class" value="SpawnCube2SDX, SCore" />
+		  <property name="Config" value="eg=AnimalSwiming;buff=buffOrderStay;pc=0;keep=0" />
+	  </block>
+
+Version: 20.6.231.98
+
+	[ Entity Alive Patch ]
+		- Moved SpawnOnDeath() to a prefix rather than postfix, to remove ragdoll
+
+	[ Fire Manager ]
+		- Fixed a threading issue where a zombie hand attack would crash if it tried to add fire.
+		- Fixed an issue where a Material does not have MaterialDamage setting (error reported by magejosh)
+
+Version: 20.6.230.1610
+
+	[ Entity Alive Patch ]
+		- Fixed an issue where entity's using the Vulture class were stuck in their jump pose.
+
+		- Added a ForceDespawn() call to the SpawnOnDeath() feature.
+
+	[ Fire Manager ]
+		- Moved registering of particles to the Block.Init()
+			-> Checks the block and material for FireParticle and SmokeParticle.
+
+
+Version:  20.6.230.86
+
+	[ Remote Storage ]
+      - Fixed Bug where items with ItemQuality where not removed from containers from matteo
+
+	[ Fire Manager ]
+		- Removed test code that turned terrain into burn forest when burned.
+		- Updated Explosion patch.
+			<property name="Explosion.BlockDamage" value="0"/>  <!-- Setting it to 0 neither starts nor puts out a fire -->
+			<property name="Explosion.BlockDamage" value="-1"/>  <!-- extinguishes. Value less than 0 -->
+			<property name="Explosion.BlockDamage" value="1"/>  <!-- lights fire. Value higher than 0 -->
+
+				
+Version: 20.6.229.1021
+
+	[ Fire Manager ]
+		- Added optional cvar flag to MinEffect for CheckFirePRoxity. By default, this is _closeFires
+			<triggered_effect trigger="onSelfBuffUpdate" action="CheckFireProximity, SCore" range="5" cvar="_closeFires" />_
+		- This allows you to specify different cvars for different ranges
+
+		- Added support for a FireDowngradeBlock property on a block.
+			<property name="FireDowngradeBlock" value="terrSnow" />
+
+			-> This will downgrade a block that is damaged by fire only.
+			-> If set, the downgraded block will go through the blockplaceholders for other options.
+			-> If the new block is flammable, it will remain on fire.
+			-> If the new block is not flammable, it will get extinguished.
+
+
+Version: 20.6.229.2113
+
+	[ Fire Manager ]
+		- Fixed an issue where zombies do not catch fire walking through fire.
+
+
+Version: 20.6.229.2113
+	[ Fire Manager ]
+		- Hot fix to prevent crashing when adding sound (like trees)
+
+		- Exposed new properties in Config/blocks.xml
+				<property name="SmokeTime" value="60" />					<!-- How long the smoke will stay on a block. -->
+				<property name="FireSound" value="FireMediumLoop" />		<!-- Sound Data Node to use. Can be over-ridden by individual block -->
+		- FireSound can be over-written on a block by basis.		
+
+Version: 20.5.228.1520
+
+	[ Fire Manager ]
+		- Added new buff Requirement to determine if you were close to a fire block
+			<requirement name="RequirementIsNearFire, SCore" range="5" />
+
+		- Added a new MinEffect to determine how many burning blocks are within the player.
+			<triggered_effect trigger="onSelfBuffUpdate" action="CheckFireProximity, SCore" range="5"  />		
+
+			-> This sets a cvar called _closeFires with how many burning blocks are near by.
+		
+		- Added sound effects for fire.
+
+	[ Remote Storage ]
+    	- Added Invert feature to disabledsender
+			-> If Enabled only mentioned containers share inventory
+        - Added grouping of workstations to nottoworkstation and bindtoworkstation
+			-> It is now possible to group multiple workstations to a group of storages
+
+
+Version: 20.5.227.1659
+
+	[ Fire Manager ]
+		- Updated the code to set fire to players to use AddBuff instead of AddBuffNetwork
+
+	[ SpawnCube2SDX ]
+		- Added two new mineffect to set and clear owner of the SpawnCube2SDX
+
+			<triggered_effect trigger="onSelfDamagedBlock" action="ClearOwner, SCore" />
+			<triggered_effect trigger="onSelfDamagedBlock" action="SetOwner, SCore" />
+
+Version: 20.5.227.925
+	
+	[ Remote Recipes ]
+		- Merged changes from matteo
+			added features requested by pipermac...
+			updated searchnearbycontainers since checks are already done by gettileentities.
+			changed some methods to use searchnearbycontainers instead of gettileentities.
+
+Version:  20.5.227.95
+	
+	[ SpawnCube2SDX ]
+		- Added Harmony patch to preserve ownership during upgrades / downgrades
+			-> Downgrade / Upgrade targets must use the same SpawnCube2SDX class
+				<property name="Class" value="SpawnCube2SDX, SCore" />
+			-> Config property line can be ommitted, or blanked, for non-spawning spawnCube.
+				
+
+
+
+Version: 20.5.226.2037
+
+	[ Fire Manager ]
+		- Fixed an issue with the FireManager not tracking fires on dedi correctly
+		- Fixed an issue where melee attack does not set fires correctly (only partially applying fire )
+		- Updated default Config/blocks.xml's entry for what is flammable or not.
+		- Added protection gate for MinEffects when fire manager is off line.
+		
+
+Version: 20.5.226.1035
+	
+	[ Fire Manager ]
+		- Moved fire buff on walk to Entityalive patch rather than block
+		- Fire hurts now.
+
+	[ Config/blocks.xml ]
+		- Cleaned up an old Broadcastmanager node.
+
+Version: 20.5.224.1353
+	[ Broadcast feature ]
+		- Update from matteo, removing second button, updating sprites
+
+
+Version: 20.5.224.1021
+
+	[ Broadcast feature ]
+		- Fixed an issue with a null ref when the xui.currentworkstation is empty
+
+	[ Quests ]
+		- Added new ObjectiveBlockDestroySDX, SCore. Example in Config/quests.xml
+
+			<objective type="BlockDestroySDX, SCore" id="frameShapes" value="1" phase="2"/>
+
+		
+Version: 20.5.223.110
+	[ Broadcast feature ]
+		- New Broadcast Manager feature by matteo ( https://youtu.be/BGPSIc5HUgg )
+		- New NetPackages to support broadcast feature
+
+	[ Remote Containers ]
+		- Fix by matteo with regards to pulling ingredients for forge
+
+Version: 20.5.221.934
+
+	[ Remote Containers ]
+		- Merged fixes from matteo
+
+	[ EntityEnemySDX ]
+		- Merged fix for IsAlwaysAwake
+
+
+Version: 20.5.220.1149
+
+	[ Remote Containers ]
+		- Fixed an issue where items were not being removed from the container.
+
+Version: 20.5.218.1914
+
+	[ Fire Manager ]
+		- Fixed a null ref when fire manager is first started when DyanmicMesh system isn't online
+
+		- Added optional feature where randomized fire and smoke particles can be used, using a comma-seperated format.
+			If this property is not defined on the Configuration block, it uses default Fire/Smoke particle.
+
+			Example in Config/blocks.xml, but also here:
+
+					<property name="RandomFireParticle" value="#@modfolder:Resources/gupFireParticles.unity3d?gupBeavis05-Heavy,#@modfolder:Resources/gupFireParticles.unity3d?gupBeavis02-CampFire,#@modfolder:Resources/gupFireParticles.unity3d?gupBeavis03-Cartoon,#@modfolder:Resources/gupFireParticles.unity3d?gupBeavis04-SlowFire,#@modfolder:Resources/gupFireParticles.unity3d?gupBeavis06-HeavyLight" />
+
+Version: 20.5.218.174
+
+	[ Fire Manager ]
+		- Added a call to update dynamic mesh so a burned down prefab looks as you'd expect.
+		- Merged in ocbMaurice's light changes.
+			- These will turn on and off lights from the fire to improve performance
+
+	[ Portals ]
+		- Disabled ChunkObserver setting for Portals, as it was causing an error on the dedicated servers
+
+
+
+Version: 20.5.216.1632
+
+	[ Fire Manager ]
+
+		- Expanded SmokeParticle, FireParticle, and FireDamage to be read from the block's material entry.
+
+			<property name="FireDamage" value="50" /> 				<!-- How much damage each time it checks will do the block. -->
+			<property name="SmokeParticle" value="#@modfolder:Resources/PathSmoke.unity3d?P_PathSmoke_X" />		<!-- Fire particle to use -->
+			<property name="FireParticle" value="#@modfolder:Resources/gupFireParticles.unity3d?gupBeavis05-Heavy" /> <!-- Fire particle to use -->
+
+			Priority Order:  
+				Material Entry
+				Block Entry
+				Global Entry
+
+		- Added a delayTime to the MinEffectAddFireDamage. 
+			
+			The value is in milliseconds. Default is 0, with no delay.
+
+			<triggered_effect trigger="onSelfDamagedBlock" action="AddFireDamage, SCore" target="positionAOE" range="5" delayTime="1000" /> <!-- 1 second before fire starts -->
+		
+		
+
+Version: 20.5.216.1451
+
+	[ Entity ]
+		- New MinEffect to spawn an entity. The actual spawn location is hit position + 1 block up.
+		
+			For example, adding this to the ammo of a cross bolt will spawn an entity at the hit location.
+
+			<triggered_effect trigger="onProjectileImpact" action="SpawnEntityAtPoint, SCore" SpawnGroup="ZombiesBurntForest"  />
+
+
+Version: 20.5.215.1938
+	[ Fire Manager ]
+
+		- Removed verbose log output
+
+Version: 20.5.215.1628
+
+	[ TileEntity AOE ]
+		- Fixed an invalid cast from bad copy and paste job.
+
+	[ Fire Manager ]
+		- Added debug output to MinEffects, enabled via turning Logging on in the FireManagement
+
+
+
+Version: 20.5.214.1558
+	[ Ingredients From Container patches by matteo ]
+	
+		https://github.com/SphereII/SphereII.Mods/pull/46
+			changed some stuff to linq for better readabilty.
+
+		Note: Please report any kind of performance slows downs.	
+
+	[ Fire Manager ]
+		- Updated to use NetPackages.
+			-> Particles should work on Fires, extingusihes, and auto-expire
+
+		- Added new NetPackages to distribute the server's data to client's
+
+Version: 20.5.214.743
+	
+	[ Ingredients From Container Patches by matteo ]
+	
+		https://github.com/SphereII/SphereII.Mods/pull/45
+			fixed some issues with items not being removed correctly.
+		
+	[ Entity Swiming ]
+		- Pushed a fix to avoid spawning fish randomly in the world.
+
+	[ Fire ]
+		Note: Fire System is being refactored to fix a variety of issues.
+
+		- Fixed particles not showing on dedi / P2P clients.
+
+		- Changed Fire Instance start to ModEvent for GameStartDone.
+
+		- Added Cleanup call to clear possibly stale data on client restart.
+
+		- Added Reset() to clear all existing game blocks that are on fire or smoldering.
+		- Added new console command called:  fireclear
+			-> Removes all recorded blocks that were on fire or extinguished, and removes their particles.
+
+		- Fixed an issue with the NetPackageRemoveParticleEffect() with a useless write call.
+
+		- Explosions that cause BlockDamage -1, will extingish fires. BlockDamage other than -1 will set fires.
+			<property name="Explosion.BlockDamage" value="-1"/>
+
+		- Added new property to Config/blocks.xml to control the amount of smoke time at the end of a fire, in seconds.
+			<property name="SmokeTime" value="60" />
+
+		- Removed smoke particles from fires that burn themselves out. Reserving them now when you intentionally extinguish them.
+
+		- Modified MinEvent FireDamage / FireDamageCascade to support ranged targets.
+
+Version: 20.5.211.1016
+
+	[ Fire ]
+
+		- Added new Config/blocks.xml entry to allow filtering Material ID.				
+			<property name="MaterialID" value="Mplants, Mcorn" /> 	<!-- Checks the material's id to see if it should ignite  -->
+
+		- Order of Material Checks, in terms of priority:
+			ID
+			DamageCategory
+			DamageSurface
+
+		- New block properties have been exposed, over-riding global defaults for FireParticle / SmokeParticle
+			<property name="FireParticle" value="#@modfolder:Resources/gupFireParticles.unity3d?gupBeavis05-Heavy" />
+			<property name="SmokeParticle" value="#@modfolder:Resources/PathSmoke.unity3d?P_PathSmoke_X" />
+
+			Using NoParticle will skip the particle effect:
+				<property name="FireParticle" value="NoParticle" />
+				<property name="SmokeParticle" value="NoParticle" />
+
+			To mass add custom particles above to blocks, consider using an xpath similar to this:
+
+			<!-- Search for all blocks that have a Material property called Mcloth, and add in the properties to that block -->
+			<append xpath="/blocks/block[ property[@name='Material' and @value='Mcloth'] ]">
+				<property name="FireParticle" value=#@modfolder:Resources/gupFireParticles.unity3d?gupBeavis05-Heavy"" />	
+				<property name="SmokeParticle" value="#@modfolder:Resources/PathSmoke.unity3d?P_PathSmoke_X" />
+			</append>
+
+		- Add new NetPackage in attempt for particles on dedi. Needs testing.
+
+		- Added new MinEvent called AddFireDamageCascade. Defaults to block type.
+			This minevent works similar to the Extinguish Minevent, in which multiple blocks of the same type around the target is affected. Rather than extinguish, it ignites those blocks instantly.
+
+			Supported formats:
+
+				<!-- The same type of block -->
+				<triggered_effect trigger="onSelfDamagedBlock" action="AddFireDamageCascade, SCore" range="4" filter="Type" />
+
+				<!-- Shares the same material -->
+				<triggered_effect trigger="onSelfDamagedBlock" action="AddFireDamageCascade, SCore" range="4" filter="Material" />
+
+				<!-- Shares the same material damage classification -->
+				<triggered_effect trigger="onSelfDamagedBlock" action="AddFireDamageCascade, SCore" range="4" filter="MaterialDamage" />
+
+				<!-- Shares the same material surface classification -->
+				<triggered_effect trigger="onSelfDamagedBlock" action="AddFireDamageCascade, SCore" range="4" filter="MaterialSurface" />
+
+			Example, if you hit a curtain block, it will catch fire. In addition, all curtain blocks in the range of 4 are also immediately lit.
+
+
+
+
+Version: 20.5.210.1950
+
+	[ Fire ]
+		- Changed default buff when you step into the fire to be buffBurningMolotov 
+		- Added new particle from guppycur ( commented in Config/blocks.xml )
+
+		- Fire will not be added to trader-protected zones. We have to protect Jen.
+
+		- Added new Config/blocks.xml properties to configure materials and surface categories to xml. Case sensitive.
+			Example, and default:
+				<property name="MaterialDamage" value="wood, cloth" /> <!-- Checks the material's damage category to see if it should ignite  -->
+				<property name="MaterialSurface" value="wood, cloth" /> <!-- Checks the material's surface category to see if it should ignite -->
+
+		- Added new Config/blocks.xml to configure heat per burning block. Default is 1. Setting to 0 disables it.
+			<property name="HeatMapStrength" value="1"/> 			<!-- Determines how much each block contributes to heat -->
+
+		- Added new block's property to control how much fire damage the block is to take. Integer.
+			This over-rides the default global configuration.
+
+			<property name="FireDamage" value="40" />
+
+
+
+Version: 20.5.210.1020
+	[ Fire ]
+		- Fixed an issue with the particles not working at all. Great job, SphereII.
+
+
+Version: 20.5.210.859
+	
+	[ Fire ]
+		- Fixed MinEvent on the RemoveFire damage to work at aim point, rather than the barrel of extinguisher
+		- Put in a potential fix for dedi particles. Unlikely to work.
+
+Version: 20.5.209.1530
+
+	[ Fire Manager ]
+		- Applying Fire Particle on hit, instead of delayed
+		- Adjusted the CheckInterval from 10 to 20
+		- Updated fire particle from guppycur
+		- Updated default fire particle to be Heavy
+
+
+Version: 20.5.209.1414
+
+	[ Fire Manager ]
+		- Added initial implementation for lighting blocks on fire.
+
+			- When a block is added to the FireManager, it is added to a loop that checks:
+				-> Is it still flammable?
+				-> Has it been extinguished?
+				-> Does damage on the block
+				-> If damage exceeds the block, it gets downgraded, or replaced with air. (uses block placeholder)
+				-> Once all blocks are checked and calculated, it updates the chunks.
+
+		What makes a block flammable or not?
+
+			If it's a child, it won't catch fire. If its air, water, or is near water, it will not catch fire.		
+			
+			If the block has a tag of 'inflammable', it will not be burnable.
+
+			If the block has a tag of 'flammable', it will be marked as burnable. 
+				<append xpath="/blocks/block[@name='terrGravel']/property[@name='Tags']/@value">,flammable</append>
+        
+			If there is not tag, and passes the other checks, it'll check the block material from materials.xml.
+				if its DamageCategory is wood, or if its SurfaceCategory is plant, it will be flammable.
+
+		- New config entry in Config/blocks.xml
+		- New Harmony patch on OnEntityWalking, which checks if the block is burning and delivers a buff to an entityalive that walks through it.
+		- New Harmony patch to Explosion to include blocks affected by them to catch fire.
+
+		- New test items:
+			sphereTorch - When a block is struck, it is lit on fire.
+			sphereExtinguish - When a block is struck, blocks in a range of 2 of the strike position is considered extinguished.
+
+	[ Triggered Effect ]
+		- Added two new triggered effects to provide support for Fire Manager
+
+			<!-- When an item has this triggered effect hits a block that is flammable, the block will catch fire -->
+			<triggered_effect trigger="onSelfDamagedBlock" action="AddFireDamage, SCore" />
+
+			<!-- When an item has this triggered effect hits a block that is on fire, the fire still be extinguished. -->
+			<triggered_effect trigger="onSelfDamagedBlock" action="RemoveFire, SCore" target="positionAOE" range="5"/>
+
+
+Version: 20.5.207.98
+
+	[ Block ]
+
+		New Block to throw an AoE at all times. Full example xml in Config/blocks.xml.
+
+			Example:
+			<block name="sphereiiAoETest">
+				<property name="Class" value="DecoAoE, SCore" />
+				<property name="ActiveRadiusEffects" value="buffCampfireAOE(3)"/>
+
+
+Version: 20.5.194.1350
+
+	[ Crop Management ]
+		- Disabled unlimited water from bedrock block
+			- If desired to have bedrock as an unlimited water source, add the following property to the bedrock block:
+				<property name="WaterSource" value="true" />
+
+		- Added new property to global crop data that determines how much damage to a water block happens when a crop consumes.
+			- This property is defined in the CropManagement block of the SCore's configuration block.
+			- Individual plants can over-ride this property if they have it defined on their block.
+				- This is done on a block by block basis. If your plant has 3 growth cycles, you will have to define it for each block, with various possible amounts.
+			- Default is 1.
+			
+			<property name="WaterDamage" value="1" />
+
+		- If a water source has a the WaterSource property, it is considered an unlimited source of water, so be mindful of this.
+
+		- When a water pipe is removed, and the particle is still enabled, the particle will now be removed.
+
+Version:  20.5.177.1415
+
+	[ Sleepers ]
+		- Merged pull request to wake up sleepers automatically in Active sleeper volumes.
+
+Version: 20.5.174.1938
+
+	[ Portals ]
+		- Fixed an issue where the requiredPower wasn't being checked correctly for the animation.
+			- Animation may still be a bit wonky, but should be slightly improved.
+		- Fixed an issue where the sign data wasn't being saved correctly.
+
+Version: 20.5.174.218
+
+	[ Sleepers ]
+	
+		- Added the EntityEnemeySDX to the SetSleeperActive(). This was already being done for EntityAliveSDX.
+
+Version: 20.5.169.98
+
+	[ Portals ]
+		- Changed location for when animations on portal starts
+
+	[ Quests ]
+		- Changed how the EntityEnemySDX and EntityAliveSDX kills are recorded; more in line with vanilla now for MP compatibility.
+
+
+Version: 20.5.165.1145
+	[ Portals ]
+		- Fixed a bug with the dialog teleport
+
+	[ Storage ]
+		- Reduced default range from 30 to 10
+
+
+Version: 20.5.162.1349
+
+	[ Portals ]
+		- Reproduced and fixed teleporting through buff / dialog and landing on a roof
+		- Added samplePortal06 which acts like a non-powered, player-editable test portal.
+
+	[ Storage ]
+		- Highly Experimental Feature
+		- New property in blocks.xml to turn this highly experimental feature on.
+			<property class="AdvancedRecipes" >
+				<property name="ReadFromContainers" value="true"/>
+				<property name="Distance" value="30" />  <!-- This is not 30 blocks, but rather a distance between you and the container. This is roughly about 6 or 7 blocks.-->
+			</property>
+
+		- When set to true, this highly experimental feature will read from containers around the player, pulling items out, to be used in crafting recipes.
+			- If crafting is cancelled, this highly experimental feature will dump the ingredients into the player backpack, rather than their original location.
+
+		- With regards to testing this highly experimental feature, high concentrations of containers may induce lag. We may need to put in limits on how many containers it will check.
+
+		Note: This is highly experimental feature. 
+
+	[ Food Spoilage ]
+		- If the container's Preserve bonus is set to -99, no food spoilage will occur.
+			<property name="PreserveBonus" value="-99" />
+
+
+Version: 20.5.155.1359:
+
+	[ Quests ]
+		Fixed a bug with ObjectiveEntityEnemySDXKill not recording.
+
+Version: 20.5.155.1247
+
+	[ Portals ]
+		- Added ability to define a Prefab's nameon the location line. Full example in blocks.xml as samplePortal05.
+		- If the destination= portal isn't registered, and the prefab is defined on the location line, the Portal Manager
+			will search inside of the first prefab instance it finds, with that name, with that portal.
+
+			<!-- I am samplePortal05, I go to samplePortal03, which is inside a prefab called farm_02 -->
+			<property name="Location" value="source=samplePortal05,destination=samplePortal03,prefab=farm_02" />
+		
+		- Fixed a bug where requiredPower wasn't being accurately checked.
+		- Made Portals be ChunkObservers
+
+Version: 20.5.151.934
+	
+	[ Lock Picks ]
+		- Added a new property to be read from Doors. If set to false, the doors are not pickable, and revert to vanilla
+			<property name="Pickable" value="false" />
+
+		- If the door has an Owner ( Player-placed), the door will not be pickable.
+
+	[ Quests ]
+		- Added new EntityEnemySDX objective
+			<objective type="EntityEnemySDXKill, SCore" id="npcHarleyEmptyHand" value="2" phase="3"/>
+
+	[ Food Spoilage ]
+		- No code changes, documentation only:
+			- Added an example items.xml entry to show how to specify food spoilage on the food items. Turning on the food spoilage in the blocks.xml does not fully activate food spoilage.
+			- The blocks.xml needs to enable the food spoilage, and the foot items must contain new properties to allow spoiling.
+			- khzmusik has an excellent modlet for this: https://gitlab.com/karlgiesing/7d2d-a20-modlets/-/tree/main/khzmusik_Food_Spoilage
+
+	[ Portals ]
+		- Added a check to see if the teleport request is either legacy support or the newer style.
+			- This should fix the MinEvent Teleport and other one-way teleports.
+			- If a location= only contains a single value, it's determined to be legacy
+			- It will check all the portals for destination=, and then check its source=
+
+	[ Dialogs ]
+		- Added in a crude extend option which will be expanded more. I wouldn't use this yet, if I were you.
+
+Version:20.5.149.1038
+	[ Portals ]
+		- When a new portal is added, it checks if the source location already exists, and how many times. If there's already 2, the portal is marked as invalid, and is not linked in.
+			- Operates on first set basis. New portals will NOT over-write existing portal locations. They must be removed before they can be re-assigned.
+		- Sunsetting Portal, SCore blocks. It'll now pass through to PoweredPortal, SCore
+			- Note: Portal2, SCore exists in code to replicate the original code, but not intended to be used.
+
+		- The difference between a Powered Portal and non-Powered Portal is the RequiredPower value.
+			<property name="RequiredPower" value="7"/>
+			When the property is not set, it defaults to -1, and the portal does not need power to operate.
+			Set to 0 to disable a portal from getting power through extends.
+
+		MinEffectTeleport and DialogActionTeleport should accept  location="destination=portal2". 
+			- Source is not set up for these methods, unless someone has a use-case.
+
+		- If a PoweredPortal requires power, then the destination must be powered to go there.
+			- If its not powered, teleport does not occur.
+
+		Added new samplePortal01b block. Source is samplePortal01cb, but destination is samplePortal01b
+			- Add buff buffTeleportTest to teleport to this portal
+
+	[ Quests ]
+		- Added SCoreQuestEventManager to manage custom events for future quests
+		- Added ObjectiveEntityAliveSDXKill, modelled off ObjectiveAnimalKill
+			<objective type="EntityAliveSDXKill, SCore" id="npcHarley" value="2" phase="3"/>
+			- Example in quests.xml
+
+		- Merged khzmusik's quest changes
+			Adds an objective that is a drop-in replacement for RandomPOIGoto except you can specify:
+
+			tags a POI must have to be included in the search, in the "include_tags" property
+			tags a POI cannot have to be included in the search, in the "exclude_tags" property
+			A distance from the quest giver, as either a max distance or range (in-game meters)
+			All of the properties from RandomPOIGoto are also supported.
+
+			A sample quest is included.
+
+			For servers, a new Net Package implementation is included.
+
+
+Version: 20.5.147.746
+
+	[ Portals ]
+		- Fixed null reference when using Legacy portal in PortalManager
+		- Added IsPowered check to Teleport method, and to animate method
+		- Added check to confirm destination is powered and available before teleporting.
+
+Version: 20.5.146.1672
+
+	[ Portals ]
+		- Added Powered Portals. May need model work to add the 'electrical connection.'
+			<block name="samplePortal04">
+				<property name="Extends" value="portalMaster"/>
+				<property name="Class" value="PoweredPortal, SCore" />
+				<property name="DisplayType" value="blockMulti"/>
+				<property name="MultiBlockDim" value="3,3,3"/>
+				<property name="Model" value="Entities/Electrical/power_switchPrefab"/>
+				<!--property name="Model" value="#@modfolder:Resources/gupFuturePortal.unity3d?guppyFuturePortal"/-->
+				<property name="Display" value="true" />
+			</block>
+
+Version: 20.5.145.728
+
+	[ Caves ]
+		- Added sanity check against a negative value for max range - Chasing possible bug with vehicle + cave connection
+
+	[ Portals ]
+		- New configuration option for blocks.xml entry for portals
+
+			If the Display property is false, nothing will show up to the user when they are looking at the portal.
+			<property name="Display" value="true" /> 
+
+			If the Display is set to true, and the player has the buff "buffyours", they will see "Teleport To <Portal Destination>"
+			<property name="DisplayBuff" value="buffyours" />
+
+			If Display is set to true, but the player does not have the buff, they will see "Telport To..."
+
+		- New <property name="Location" value="" /> Changes
+			If the value is simply Portal01, then it will act as a two-way portal to the other Portal with the same name.
+			MinEffect and Dialog teleport triggers use this syntax as well.
+
+			- New syntax:
+				<property name="Location" value="source=Portal01,destination=Portal02" />  I am Portal01, but I send the player to Portal02
+				<property name="Location" value="source=Portal01,destination=NA" />  I am Portal01, but I have no destination. I am a one way portal (people can port to me, but not from me)
+
+		- Fixed an issue with PortalMaps not being cleared from one game to another
+
+Version: 20.5.143.1141
+
+	[ Quests ]
+		Added in GiveBuff as quest award
+			<reward type="GiveBuff, SCore" id="yourbuff" />
+
+	[ Portals ]
+		- Removed OnBlockCollided, and OnWalk on triggers. Players must interact with it now.
+		- Added 2 second delay before teleport begins, starting after cooldown buff is specified.
+			<property name="CooldownBuff" value="buffTeleportCooldown" />
+			<property name="Delay" value="1000" /> <!-- Micro seconds, whole numbers only. Default is 1000ms  -->
+
+		- Added XML configuration for fixed portals
+			<property name="Location" value="Portal01" />
+
+	[ MinEvent ]
+		- Added new MinEvent to teleport the player to a certain location
+			<triggered_effect trigger="onSelfBuffStart" action="Teleport, SCore" location="Portal01" />
+
+	[ Dialog ]
+		- Added new Dialog action to trigger a teleport. It supports the following, most of which is not tested.
+
+			Teleports to a Portal
+			<action type="Teleport, SCore" id="Portal01" />
+ 
+			Teleports to the player's current bedroll
+			<action type="Teleport, SCore" id="Bedroll" />
+  
+			Teleports to the player's landclaim
+			<action type="Teleport, SCore" id="Landclaim" />
+  
+			Teleports to the player's backpack
+			<action type="Teleport, SCore" id="Backpack" />
+	
+	[ Faction Manager ]
+		- Fixed null ref for faction manager's update call
+
+	[ XML ]
+		- Commented out the error with the PortalPrefab
+
+
+Version: 20.4.126.2131
+	[ NPC ]
+		- Allowed override on a per-entity base for 
+				<property name="AllEntitiesUseFactionTargeting" value="true" />
+	[ Portals ]
+		- Preliminary code for setting Portals ready for testing. Portals are fancy signs. Add the same Text to two Portals, and they will be linked.
+			- In the case of multiple named portals, the first one discovered will be used.
+
+			Video Example: https://youtu.be/cvYxVzY_lO4
+
+			2 Portal Blocks have been defined in blocks.xml, using models provided by guppycur
+				guppyPortalMagic
+				guppyFuturePortal
+		
+
+Version: 20.4.119.941
+	[ NPC ]
+		- Added Chunk visible feature for the NPCs.
+			When the chunk is not visible, the NPC's gravity will be turned off.
+			When thec hunk is visible, the NPC's gravity will be turned on.
+			This is a potential fix for NPCs disappearing at bases, with the theory that they are falling out of the world.
+			Thanks to closer_ex
+
+	[ UAI ]
+		- New Utility AI task. 
+			- Look for a PathingCode on the NPC, and start patrolling about between all the codes.
+			- NPC will scan for all PathingCubes nearby for a code that matches its Cvar PathingCode.
+
+			- Optional buff will fire when the NPC reaches its target point.
+				- Task will not end until the buff expires
+				- Once buff expires, NPC will go to its next location.
+				- If you want an NPC to walk to a point, and stand there for 10 seconds, have the buff's duration set to 10.
+
+
+			Basic Example:
+
+			<action name="Patrol" weight="3" entity_filter="IsSelf" >
+				<task class="Patrol, SCore" run="false" buff="IsGathering"/>
+
+				<consideration class="HasPathingCode, SCore" />
+				<consideration class="EnemyNotNear, SCore" distance="15"/>
+			</action>
+
+			Setting pc=5 on a SpawnCube will set nearby NPC to path to cubes with the number 5.
+
+
+Version: 20.4.116.1950
+
+	[ Blocks ]
+		- Re-added crop trample
+			Add  fcropsDestroy to the FilterTags to enable:
+
+			<!-- To make all crops destroy on touch -->
+			 <append xpath="/blocks/block/property[@name='FilterTags' and contains(@value, 'SC_crops')]/@value">,fcropsDestroy</append>
+
+		- Added Guppycur's sprinkler to Bloom's Family Farming
+		- Added the Farmer NPC back for MyFarmer entity in Bloom's
+
+Version: 20.3.113.106
+
+	Demo and water / crop overview: https://youtu.be/ApcwwfexxWU
+
+	"Bloom's Family Farming" Modlet contains sample XML configuration to:
+		- Turn on water requirement feature
+		- Update all crops to require water
+		- Updated metalPipe's to water pipe class
+		- Added My Farmer NPC ( Uses Nurse model from 1-NPCCore (required))
+		- Added Crop Control Panel
+		-Add Farm UAI
+
+		- Use this Modlet with the latest SCore and latest 1-NPCCore for a complete test environment.
+
+	[ Crop Management ]
+		- Improved the valve system to be a bit more reliable
+		- Fixed BloomTest01 Prefab used for testing: 
+			- Includes water tower, valves, pipes, and farm plots
+	
+	[ UAI ]
+		- Improved Farming Task
+			- Farmer task now harvests and replants crops
+
+Version: 20.3.111.x
+	
+	[ Crop Management ]
+		- Fixes for the UAI Task for planting/ checking
+		- NPCs will be able to:
+			a) Look in their inventory to find seeds
+			b) Plant those seeds
+			c) Once all seeds are gone, they maintain the crops
+				- Checking for bugs ( SCore doesn't have bugs, but the plants may)
+				- Potentially watering the crops, avoiding water waste
+			d) Harvest crops when they are ready, and store crops in their inventory.
+				- Any seeds harvested will be replanted.
+
+Version: 20.3.110.1815
+	[ Blocks ]
+		BlockTakeAndReplace has a new property to allow you to specify which item is allowed. This is a comma delimited list.
+			<property name="HoldingItem" value="meleeToolRepairT1ClawHammer" />
+			<property name="HoldingItem" value="meleeToolRepairT1ClawHammer,meleeStoneTool" />
+
+		Updated BlockUtilities to add particles centered to the block, instead of at the edge.
+
+	[ Crop Management ]
+		- Added new Blocks for support:
+			BlockCropControlPanel - Used to debug and control the pipe system
+			BlockFarmPlotSDX - Used to update the vanilla's FarmPlots
+		-Added new FarmPlotData to hold FarmPlot information
+		-Added PlantData to hold plant data
+		-Added Pipe class to hold piping information
+		-Added FarmPlotManager and WaterPipeManager to handle their tasks.
+			- Removed pipe management from crop
+
+
+	[ Utility AI]
+		- Added IsNearFarm consideration 
+		- Added UAITaskFarming task
+
+	[ Modlet ]
+		Added new Bloom's Family Farming modlet to the SphereII.Mods repo
+		This modlet contains XML to turn on and manage the crop management system with examples
+		Also includes a prefab called BloomTest01
+			- From menu, go into Prefab Tools and load up BloomTest01, then Play test.
+		Added SphereiiFlat world to be used for durability testing.
+
+Version: 20.3.105.1149
+
+	[ Quests ]
+		- FuriousRamsay has been working on fixing the distance restriction bug on quests
+		- New Objectives:   
+			RandomGotoSDX, SCore
+				<objective type="RandomGotoSDX, SCore" value="700-800" phase="1">
+					<property name="completion_distance" value="50"/>
+					<property name="nav_object" value="quest" />
+				</objective>
+
+			RandomPOIGotoSDX, SCore
+				<objective type="RandomPOIGotoSDX, SCore" value="400-800">
+					<property name="phase" value="1"/>
+					<property name="nav_object" value="quest" />
+				</objective>
+
+		- NetPackageQuestGotoPointSDX and NetPackageQuestGotoPointSDX to allow distance checks to work on dedicated servers ( FuriousRamsay )
+
+	[ MinEvents ]
+		MinEventActionChangeFactionSDX2: Same as the MinEventActionChangeFactionSDX, except it resets the entity's attack and revenge target ( FuriousRamsay )
+			<triggered_effect trigger="onSelfBuffStart" action="ChangeFactionSDX2, SCore" target="self" value="undead" /> 
+		
+		MinEventActionResetTargetsSDX: Resets the target's attack and revenge targets.
+			 <triggered_effect trigger="onSelfDamagedOther" action="MinEventActionResetTargetsSDX, SCore"/>
+
+
+	[ NPCs ]
+		- Added FuriousRamsay's fixes for SetDead(), and OnMission collision ( should be able to fly with NPCs now )
+	
+	[ Caves ]
+		- Fixed issue where random blocks would appear underground during the decoration phase.
+		- Modified Cave prefab locations to help avoid isolated prefabs
+		- Fixed an issue where the first level of caves did not have decorations.
+		- Currently, no cave openings are available when cave types are Mountain or DeepMountain.
+
+	[ Crop Management ]	
+		- Initial Implementation of Advanced Crop Management features. This will likely be buggy.
+
+		- There's a lot to unpack here. Buckle up.
+
+		- When enabled, crops will need to be within a 5x5 block radious of water block. 
+			This is configurable with the WaterRange on a per-plant basis. Default is 5.
+			Each plant will record where it's water blocks are. 
+			The CheckInterval is used to determine how often the plant will check its water source.
+				- If the water is gone when checked, the plant will rescan for a new block.
+				- If no new water block is found, it will wilt.
+				- Whenever a plant successfully checks in with water, it will do 1 point of damage to the water.
+					- When a water block's damage exceeds its max damage (100 by default), it will turn into air.
+			Crop data is not persisted to disk. Rather, if data is missing, it simply rechecks and re-discovers.
+
+		- SCore's blocks.xml contains a new entry:
+			<!-- Turns on support for the PlantGrowingSDX, SCore features for more advanced crop -->
+			<property class="CropManagement" >
+				<!-- Turns on logging to help debug -->
+				<property name="Logging" value="false"/>
+
+				<!-- Controls if crops are to be managed -->
+				<property name="CropEnable" value="false"/>
+				
+				<!-- How often the crops should check for water -->
+				<property name="CheckInterval" value="600" />
+
+				<!-- How many pipes to scan -->
+				<property name="MaxPipeLength" value="500" />
+			</property>
+
+			As always, it is not recommended to change the SCore's blocks.xml directly when adjusting, but rather use a modlet:
+				<!-- Turning on Crops-->
+				<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='CropManagement']/property[@name='CropEnable']/@value">true</set>
+
+				<!-- Checks how often the Crop Manager will check in with the plants. -->
+				<set xpath="/blocks/block[@name='ConfigFeatureBlock']/property[@class='CropManagement']/property[@name='CheckInterval']/@value">120</set>
+
+			
+		- Crops that you want to manage under the advanced crop management must use the new classes:
+			BlockPlantGrowingSDX
+
+			It supports the following properties:
+				RequireWater: [ true/false ]
+					Allows invidiaul plants to control whether they need water or not. 
+					- This can be read using extends, but overridden by the individual block
+				WaterRange: [ 5 ]
+					Allows individual plants to control how far away their water can be.
+					- This can be read using extends, but overridden by the individual block
+				PlantGrowing.Wilt: [ treeDeadPineLeaf ]
+					If a plant goes without water for tool long, it will wilt into this block.
+					- Can be air as well.
+				Wilt: [ true / false ]: default false.
+					- If a plant cannot find a water source, it will wilt and destroy itself.
+
+			Example XML to convert all growable crops to use water.
+
+				<!-- Setting up defaults -->
+				<!-- Changing all crops to using the PlantGrowingSDX class -->
+				<set xpath="/blocks/block[@name='cropsGrowingMaster']/property[@name='Class']/@value">PlantGrowingSDX, SCore</set>
+				<append xpath="/blocks/block[@name='cropsGrowingMaster']">
+					<!-- If the crop needs water to survive. Default: false -->
+					<property name="RequireWater" value="true" /> 
+
+					<!-- how far away that block can be from a water source: Default is 5 -->
+					<property name="WaterRange" value="5" />  
+
+					<!-- The block the crop downgrades too if its dead. Default: Air-->
+					<property name="PlantGrowing.Wilt" value="treeDeadPineLeaf"/>
+
+					<!-- if set to true, the plant will die when there is no water near by. -->
+					<property name="Wilt" value="true" />
+				</append>
+
+		- In order to better support crops, and make them more fun, support for water pipes have been added.
+			Two new classes have been written:
+				BlockWaterPipeSDX: This block designates a block as a water carrier. It is not a water source itself, but can allow water to 'move' through. 
+					- One section of the pipe must touch a water source block.
+
+					- In this example, I convert all metalPipe's to be used as water pipes
+						<append xpath="/blocks/block[starts-with(@name, 'metalPipe')]">
+							<property name="Class" value="WaterPipeSDX, SCore" />
+						</append>
+
+				BlockWaterSourceSDX: This block designates a block as a water distributor. It is not a water source itself.
+					- if the BlockWaterSourceSDX is connected to a series of BlockWaterPipeSDX which is connected to a water source block, it will act like a water source block.
+
+					- In this example, I'm using the metalPipeValue as a distributor
+						<set xpath="/blocks/block[@name='metalPipeValve']/property[@name='Class']/@value">WaterSourceSDX, SCore</set>
+
+
+			A water source block is currently defined as:
+				BlockLiquidV2 : Water from a river, lake, or dumped from a bucket
+				terrBedRock: if you connect a pipe to bedrock, it will act as an unlimited water source.
+
+				Any block is the property WaterSource is set on it, and set to true
+					<property name="WaterSource" value="true" />
+
+			
+
+
+
+
+Version: 20.3.101.172
+	- Fixed recursive method that was causing crashes on MarkToUnload()
+	- Modified TileEntityAlwaysActive patch.
+		If any TileEntity has this XML property, it will be Always On.
+			<property name="AlwaysActive" value="true" />
+		This feature can be used on any other TileEntities to distribute a buff similar to the CampFire's warming buff.
+		
+		Note: This excludes Forge and Workstation Tile Entities.
+	- Disabled the IsQuestGiver on the Entities
+
+Version: 20.3.100.1629
+	- Fixed SpawnCube2 issue on dedi where preview was not being cleared.
+	- Fixed GotoPOISDX to prefer exact names, rather than wild card
+
+Version: 20 3.100.1044
+	- Reverted Sebastian Cave changes, and changed default to Legacy
+	- Added working cave entrances
+	- Widened cave system to allow more room, and some chaos.
+	- Fixed cave spawning of zombies.
+		- Spawning may be a bit sparse, due to the many levels of the cave systems and max zombies.
+		Suggestions on fleshing it out more would be to add in SpawnCubes to the blockplaceholders that spawn more zombies.
+	- Fixed double spawns on SpawnCube on dedi
+	- Turned off SmarterEntities by default in blocks.xml, to get rid of the path node warnings.
+		- Max revisit later if functionality has changed due to turning it off.
+	- Turned off Sound when NPC is on a mission.
+
+
+Version: 20.3.93.840
+	- Reduced the height position of the SetPosition() to calm their leader when on a mission.
+	- Overrode ProcessDamageResponse() not to process damage if NPC is on a mission
+	- Overrode IsImmuneToLegdamage, returning true if OnMission.
+	- Fixed possible null ref in IsInertEntity()
+	- Updated MarkToUnload to go to base class when NPC is ordered to Stay or Patrol. 
+		- This is an attempt to fix the disappearing NPCs at the bases.
+
+Version: 20.3.84.x
+
+	- When driving in a vehicle, NPCs will no longer teleport to you after a distance, but does a SetPosition() on a tighter range
+	- NPCMOD-FT-0045 : Added DespawnNPC MinEffect: <triggered_effect trigger="onSelfBuffRemove" action="DespawnNPC, SCore" />
+	- Added new Property for entities, which controls if they run "leader checks" for increase performance. Defaults to True.
+		<property name="Hirable" value="false" />
+	- Added new Property for entities, which controls if they can give or process quests. Defaults to true.
+		<property name="IsQuestGiver" value="false" />
+
+
+Version: 20.2.83.1240
+	
+	- Performance Tweaks:
+		- Disabled DrawLine in Utils from raycasting path finding
+		- Disabled Progression on NPCs
+	- Updated Pathing Cube to disallow non-owners to edit
+	- Similar change to the SpawnCube with above change
+	- Added TimeToDie for EntityEnemySDX
+	- Added DialogAction for AddItemSDX, SCore
+
+Version: 20.2.60.742
+
+	- Merged khzmusik's fix for infinite resource bug
+
+ Version: 20.2.57.x
+	- Loot task work.
+	- SpawnCube breaks after trigger now.
+
+Version: 20.2.56.x
+	- Added more enhancements for SpawnCube2SDX. See blocks.xml for examples on advanced configuration.
+	- Fixed issue with Sleepers not getting the correct buffs on waking up.
+	- Fixed issue with Attack UAI being locked when target was still visible but not accessible.
+
+Version: 20.2.55.x
+	- Fixed issue with bad ray cast, causing NPCs to shoot through doors and walls
+	- Multiple fixes to the BlockSpawnCube2SDX. This cube will allow you to spawn in a one-time entity.
+		Example Usage:
+	        <property name="Class" value="SpawnCube2SDX, SCore" />
+			<!-- Will spawn NPC furiousRamsayBristonStart_FR, give them the buffOrderStay, pathing cube 0, and auto-assigns yourself as their leader -->
+            <property name="Config" value="ec=FuriousRamsayBristonStart_FR;buff=buffOrderStay;pc=0;leader=true" />
+			
+			<!-- Will spawn the NPC and ordered to Stay. They do not have a pathing code, no leader -->
+			<property name="Config" value="ec=FuriousRamsayBristonStart_FR;task=stay" />
+
+
+		Note: There is a delay of about 5 seconds on MP servers for the leader to be auto-assigned.
+
+	- Added support for new cvar called FailOnDistance.
+		- If this cvar is set on the player, all hired NPCs will use this FailOnDistance range, rather than the one hard coded in the utilityai.
+		- If this cvar is set on the NPC, then that NPC will use that range, instead of the one on the player or utilityai.
+
+
+Version: 20.2.45
+	- Added IsAlwaysAwake to be false. This allows Sleeping NPCs to be fully awake on spawn in.
+		XML Property can be toggled with the following line:
+			<property name="SleeperInstantAwake" value="false" />
+			<property name="SleeperInstantAwake" value="true" />
+
+	- Reduced the Auto-scan for pathing cubes to be a lot smaller (about a block away)
+	- Default PathingCode is -1, so avoid this number, as its equivalent to not having a code.
+	- Gave sleeping NPCs hearing for a threhold to wake them up.
+	- Disable UAI when NPCs are sleeping
+
+	- Slightly changed the consideration for InWeaponRange, to take in effect if it should shoot a player, if it could see it, but not reach it.
+[ XUI ]
+	- Added a few more bindings to npc stat window
+
+Version: 20.2.44
+
+	- Added toggle to turn on and off Advanced signs (0-SCore/Config/blocks.xml) to turn off gif / img support 
+	- Moved Sign reading data to a universal class to allow EntityAliveSDX to re-use code
+	- Added EntityAliveSDX to read from a nearby Pathing Cube
+		Using the PathingCube (or PathingCube2) blocks, you can place an invisible sign near a sleeper
+		Once placed, you can configure it as follows
+			Task=stay  [ wander, guard, follow ] 
+				- This will give the nearby EntityAliveSDX a starting order. 
+
+				Example, you could put in Task=stay for NPCs that you want to behave like a turret
+
+				Internally, the above tasks gives SCore's based-buffs  ( buffOrderStay, buffOrderWander, etc)
+				Task can also be used to specify a general buff.
+
+		Example: https://youtu.be/IuK_sN3WHZ4
+
+	- Fixed a null ref where NPC following a NPC leader
+		With this error fixed, the old herd spawner now works. This spawner is a special EntityClass that you can add to your sleeper volume, or in entitygroups, and will spawn multiple entities.
+		This can be used, for example, to set up a Solider Group, which could have an officer, along with a few grunts. The soldiers will follow the officer around as they would if hired by a player.
+
+		For this to work, you must give them the NPCHired, or equivalent, UAI. These do not need to be hirable by the player, but must contain the follow tasks.
+
+		When you spawn in the SoldierPackMelee entity, it'll spawn the leader and followers.
+
+		Example: https://youtu.be/OSlfwuX9r6Y
+
+		EntityClasses.xml example:
+
+		<append xpath="/entity_classes">
+			<entity_class name="spawnerStub">
+				<property name="Mesh" value="Gore/gore_block1_bonesPrefab"/>
+				<property name="ModelType" value="Custom"/>
+				<property name="Prefab" value="Backpack"/>
+				<property name="Class" value="EntityAliveEventSpawnerSDX, SCore"/>
+				<property name="Parent" value="Animals"/>
+				<property name="TimeStayAfterDeath" value="1"/>
+				<property name="IsEnemyEntity" value="false"/>
+				<property name="LootListOnDeath" value="banditLoot"/>
+				<property name="Faction" value="animals"/>
+			</entity_class>
+		
+			<!-- the Leader is spawned in first, then the Followers. The Followers set their Leader cvar to that of the Leader. -->
+			<entity_class name="SoldierPackMelee" extends="spawnerStub">
+				<property name="Prefab" value="Backpack"/>
+				<property class="SpawnSettings" >
+				<property name="Leader" value="survivorOfficerDPistol" />
+				<!-- Params 2,3. This means that 2 to 3 of each of the followers will be spawned. -->
+				<property name="Followers" value="survivorSoldier1Club,survivorSoldier2Knife,survivorSoldier4Machete" param1="2,3"/>
+				</property>
+			</entity_class>
+
+			<entity_class name="SoldierPackRanged" extends="spawnerStub">
+				<property name="Prefab" value="Backpack"/>
+				<property class="SpawnSettings" >
+				<property name="Leader" value="survivorOfficerTRifle" />
+				<property name="Followers" value="survivorOfficerAK47,survivorOfficerSMG,survivorSoldier1TRifle,survivorSoldier3AK47" />
+				</property>
+			</entity_class>
+		</append>
+
+Version: 20.2.43.147
+
+	- Version bump to catch up to the Alpha 20.2
+
+[ NPC Fixes ]
+
+	- Due to the refactoring for the damage to block code, some issues are listed as potentially fixed only.
+
+	- NPCMOD-FT-0038        NPCs be given the ability to damage blocks
+
+		Tested:
+				<action name="MeleeAttackBlock" weight="3">
+					<task class="AttackTargetEntitySDX, SCore" action_index="0"/>
+					<consideration class="PathBlockedSDX, SCore"  />
+					<consideration class="TargetType" type="Block"/>
+				</action>
+		- Recommended that NotPathBlockedSDX, SCore for approach-style tasks
+	
+	- NPCMOD-SP-0071        Hired NPC names show up twice above their heads ( Potentially )
+	- NPCMOD-SP-0062        Melee NPCs run max distance away from their target then begin their approach ( Potentially )
+	- NPCMOD-SP-0075        NPCs will get stuck on certain blocks (like trees) ( Potentially )
+	- NPCMOD-SP-0048        NPCs can talk to the player while fighting, until they are hit by an enemy
+		- Added a call to the UAI System IsEnemyNearBy() call (10 distance).
+	- NPCMOD-DEDI-0006    NPCs can be hired by another player after you've hired them and log out
+		- Changed the GetLeaderOrOwner() call to just check for existence of cvars as a gap solution, 
+			rather than expecting the entity to be online in order for it to be valid.
+
+	- Added a new fun task ( Work in Progress. Don't use in production )
+				<!-- Allows the entity to place a timed charge on a door -->
+				<action name="DoorBuster" weight="4">
+					<task class="BreakBlock, SCore" action_index="0"/>
+					<consideration class="PathBlockedSDX, SCore"  />
+					<consideration class="TargetType" type="BlockDoorSecure"/>
+				</action>
+
+	- Many, many UAI tweaks, cleaning up old code, ironing out behaviours.
+	- Gound work for expanding the available ItemActions 2,3,4.
+	- Added MeleeSDX to allow non-EntityEnemy's target blocks effectively.
+
+[ UI ]
+	- Fixed the NPCStatWindow to update properly
+	- Fixed Respondent Name to display
+
+Version: 20.0.39
+
+[ NPC Fixes ]
+	Initial implementation of Break Blocks functionality.
+
+[ Block Changes ]
+	- Added the ability to trigger SpawnCube when placed by a player.
+
+	Sample XML, which will spawn an empty handed nurse on placement, and ordered to stay:
+		<block name="TestSpawnCube">
+			<property name="Extends" value="SpawnCube"/>
+			<property name="Config" value="ec=npcNurseEmptyHand;buff=buffOrderStay;pc=0" />
+		</block>
+
+Version: 20.0.38
+
+[ NPC Fixes ]
+	NPCMOD-SP-0072  Hired NPC names disappear from life bars when you enter a vehicle
+	NPCMOD-SP-0076  Limit opening of doors to IsHuman or IsHired
+	NPCMOD-SP-0073  Hired NPC footsteps can be heard when you hop on a bike and travel
+					- Also disable footsteps when flying tags is used
+	NPCMOD-SP-0075  Potentially fixed:  NPCs will get stuck on certain blocks (like trees) 
+
+	Hired NPCs which are ordered to Stay will unload when a chunk is unloaded, and re-load back in.
+	Merged Food Spoilage patch
+
+
+Version: 20.0.33.1824
+
+[ Dialog ]
+	- Made Dialog requirement Hired simpler
+
+[ NPC Fixes ]
+	- Removed NPCs that were told to guard / stay not to show up in Companion screen
+		- This leaves room for NPCs that are currently with you.
+
+[ Fixes ]
+	- Fixed a bug with QuickContinue when steam wasn't running at all.
+
+Version: 20.0.32.x
+
+[ Debug Information ]
+	- Added Logging for when NPC has died, it will display its active buffs in the log file
+
+[ NPC Fixes ]
+	- Fixed an issue where NPCs would get confused when two players were nearby
+	- Fixed an issue where NPCs wouldn't talk to you without a very long delay after a fight
+
+Version: 20.0.30.x
+
+[ Configuration Change ]
+	- Disabled Advanced Workstation from being enabled by default
+
+[ NPC Fixes ]
+	- Hired NPCs will drop their backpacks, if anything is in them
+	- Fixed Bandit loot containers
+
+
+
+Version: 20.0.29.x
+
+[ Fixes ]
+	- Fixed null ref when trying to get a block outside of world bounds in GetGamePath.
+	- Fixed Spook's SkyManager reference with IsBloodMoonVisible.
+	- Connected progression into lock picking, and adjusted default difficulties ( adjustments in the Configuration Blocks.xml of the SCore)
+	- Fixed a potential issue with Buried Supplies not working when Trader Protection is removed
+		- Note to Self: If you want to test Clear Zombies quest, remember to enable Enenmy Spawning. It'll save a lot of confusion.
+
+[ XUI Changes ]
+	- Added new XUiC_NPCStatWindow for Sirillion hooks
+	- Fixed issue where a null reference would happen on empty strings.
+
+[ Quest Changes ]
+	- Added NetPackage to better handle GotoPOISDX
+	- Added Biome Filtering for GotoPOISDX:
+		<property name="biome_filter_type" value="ExcludeBiome" />
+		<property name="biome_filter" value="wasteland" />
+	- Added additional debug for GotoPOISDX. Enter in dm mode to see.
+	- Note: If a quest does not show up on the map, confirm you have nav_object property inside the objective
+		<property name="nav_object" value="return_to_trader" />
+	- Changed GetPOIPrefabs() to GetDynamicPrefabs() for searching for GotoPOISDX
+	- Fixed null ref when PrefabName was not set.
+	- Created a QuestUtils static class to share code between NetPackage and GotoPOIS
+
+[ NPC Changes ]
+	- Added hired NPCs to show up in Companions window (Configuration block option to toggle)
+	- Color adjusted the hired NPCs on compass to match companion window, when enabled.
+	- Partial hook up for NPCs to earn experience
+	- If an entity is dead, pass the CanTakeDamage checks. The dead get no reprieve.
+	- Fixed wander where the position was in the air, causing NPCs to stop trying to move there.	
+	- Hired NPCs will no longer take damage from traps (BlockDamage). 
+		If they are smart enough to get paid, they are smart enough to step carefully through barb wire
+	- If NPCs have anything in their bag (backpack)  or loot container (what the player has access too), a bag will drop with the contents.
+		-  If no contents, then no bag drops.
+
+[ Buffs.xml Changes ]
+	- New Buff orders:
+		buffOrderGuardHere Sets cvar to Order 2, and sets guardPosition to where the player is standing.
+
+	- Updated Buff Order:
+		buffOrderStay updated to set guardPosition to be where the NPC is standing.
+		
+
+[ Dialog Changes ]
+	- Added new Dialog requirements:  
+		<requirement type="HasPackage, SCore" requirementtype="Hide" value="NPCAnimalBasic" /> <!-- true if this UAI Package is on this NPC-->
+		<requirement type="HasPackage, SCore" requirementtype="Hide" value="!NPCAnimalBasic" /> <!-- true if this UAI package is NOT on this NPC -->
+		<requirement type="HasTask, SCore" requirementtype="Hide" value="LootBasic" /> <!-- True if this UAI Action Name is on the NPC -->
+		<requirement type="HasTask, SCore" requirementtype="Hide" value="!LootBasic" /> <!-- True if this UAI Action name is NOT on this NPC -->
+
+[ UAI Changes ]
+
+	- Added new UAI Task called Guard. This task can replae the Stay action using IdleSDX.
+		- Guard is similar to Stay and can be a replacement for Stay.
+		- Two new MinEffectActions have been created for this, and is applied by the buff in the SCore's buffs.xml
+			- MinEventActionGuardHere : This sets the NPC's guard position to match the player's current position, as well as the direction the player is looking.
+			- MinEventActionGuardThere: This sets the NPC's guard position to match where the NPC is currently staying, with the look direction the same.
+	- Added additional feature for the Wander UAI task:
+		<task class="WanderSDX, SCore" interest="Loot:cntBirdnest"/>
+	
+		When interest is specified, there is a 30% chance triggering a TileEntity scan matching the value.
+	
+		For example, interest="Loot" will search for all Loot containers in the area, and pick one.
+	
+		If the TileEntity's entry has a :, that further allows filtering based on block name.
+		
+			<task class="WanderSDX, SCore" interest="Loot:cntBirdnest"/> <!-- scan for any loot container that has a block name that starts with cntBirdNest -->
+
+
+		If interest is not specified, a standard wander is triggered.
+		
+	- Fixed a bug in AttackTarget where an NPC that was told to stay, would take a few steps out of position to attack
+
+[ Mecanim Animation ]
+	- Added simple null check when the entity using Mecanim is invalid.

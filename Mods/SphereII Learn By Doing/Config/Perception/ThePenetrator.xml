@@ -1,0 +1,86 @@
+<configs>
+<append xpath="/buffs/buff[@name='buffLBD_PerceptionManager']">
+	<effect_group name="The Penetrator">
+		<requirement name="HoldingItemHasTags" tags="perkDeadEye,perkJavelinMaster"/>
+
+		<!-- XP GAIN: Multi-Kill Bonus -->
+		<triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: The Penetrator - MULTI-KILL! Attempting XP Gain (+40)">
+			<requirement name="IsAlive" target="other"/> <!-- NEW -->
+			<requirement name="HasBuff" buff="buffLBD_Penetrator_MultiHitWindow"/>
+			<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+		</triggered_effect>
+		<triggered_effect trigger="onSelfPrimaryActionRayHit" action="ModifyCVar" cvar="$perkpenetrator_lbd_xp" operation="add" value="40">
+			<requirement name="IsAlive" target="other"/> <!-- NEW -->
+			<requirement name="HasBuff" buff="buffLBD_Penetrator_MultiHitWindow"/>
+		</triggered_effect>
+
+		<!-- XP GAIN: Armored Hit Bonus -->
+		<triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: The Penetrator - Armored Hit! Attempting XP Gain (+18)">
+			<requirement name="IsAlive" target="other"/> <!-- NEW -->
+			<requirement name="EntityTagCompare" target="other" tags="feral,soldier,demolition"/>
+			<requirement name="NotHasBuff" buff="buffLBD_perkPenetrator_XPCoolDown"/>
+			<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+		</triggered_effect>
+		<triggered_effect trigger="onSelfPrimaryActionRayHit" action="ModifyCVar" cvar="$perkpenetrator_lbd_xp" operation="add" value="18">
+			<requirement name="IsAlive" target="other"/> <!-- NEW -->
+			<requirement name="EntityTagCompare" target="other" tags="feral,soldier,demolition"/>
+			<requirement name="NotHasBuff" buff="buffLBD_perkPenetrator_XPCoolDown"/>
+		</triggered_effect>
+
+		<!-- COMBO WINDOW & COOLDOWN LOGIC -->
+		<triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: The Penetrator - Starting/Refreshing Multi-Hit Window">
+			<requirement name="IsAlive" target="other"/> <!-- NEW -->
+			<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+		</triggered_effect>
+		<triggered_effect trigger="onSelfPrimaryActionRayHit" action="AddBuff" buff="buffLBD_Penetrator_MultiHitWindow">
+			<requirement name="IsAlive" target="other"/> <!-- NEW -->
+		</triggered_effect>
+
+		<triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: The Penetrator - Applying Cooldown">
+			<requirement name="IsAlive" target="other"/> <!-- NEW -->
+			<requirement name="EntityTagCompare" target="other" tags="feral,soldier,demolition"/>
+			<requirement name="NotHasBuff" buff="buffLBD_perkPenetrator_XPCoolDown"/>
+			<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+		</triggered_effect>
+		<triggered_effect trigger="onSelfPrimaryActionRayHit" action="AddBuff" buff="buffLBD_perkPenetrator_XPCoolDown">
+			<requirement name="IsAlive" target="other"/> <!-- NEW -->
+			<requirement name="EntityTagCompare" target="other" tags="feral,soldier,demolition"/>
+			<requirement name="NotHasBuff" buff="buffLBD_perkPenetrator_XPCoolDown"/>
+		</triggered_effect>
+
+		<!-- LEVEL UP CHECK LOGIC -->
+		<triggered_effect trigger="onSelfPrimaryActionRayHit" action="LogMessageCVars, SCore" message="LBD DEBUG: The Penetrator - Triggering Level Up Check">
+			<requirement name="IsAlive" target="other"/> <!-- NEW -->
+			<requirement name="CVarCompare" cvar="$perkpenetrator_lbd_xp" operation="GTE" value="@$perkpenetrator_lbd_xptonext"/>
+			<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+		</triggered_effect>
+		<triggered_effect trigger="onSelfPrimaryActionRayHit" action="AddBuff" buff="buffLBD_perkPenetrator_LevelUpCheck">
+			<requirement name="IsAlive" target="other"/> <!-- NEW -->
+			<requirement name="CVarCompare" cvar="$perkpenetrator_lbd_xp" operation="GTE" value="@$perkpenetrator_lbd_xptonext"/>
+		</triggered_effect>
+
+	</effect_group>
+	</append>
+
+	<append xpath="/buffs">
+		<buff name="buffLBD_perkPenetrator_LevelUpCheck" hidden="true">
+			<stack_type value="ignore"/><duration value="1"/>
+			<effect_group>
+				<requirement name="CanPurchasePerk, SCore" progression_name="perkPenetrator" />
+				<triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: The Penetrator - Level Up SUCCESS (perkPenetrator)">
+				    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+				</triggered_effect>
+				<triggered_effect trigger="onSelfBuffStart" action="AddProgressionLevel" progression_name="perkPenetrator" level="1"/>
+				<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkpenetrator_lbd_xp" operation="subtract" value="@$perkpenetrator_lbd_xptonext"/>
+				<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkpenetrator_lbd_xptonext" operation="multiply" value="@$lbd_xp_curve_multiplier"/>
+				<triggered_effect trigger="onSelfBuffStart" action="ShowToolbeltMessage" message_key="perkPenetratorLeveledUp"/>
+			</effect_group>
+			<effect_group>
+				<requirement name="!CanPurchasePerk, SCore" progression_name="perkPenetrator" />
+				<triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: The Penetrator - Level Up FAILED. Perk is locked by requirements.">
+					<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+				</triggered_effect>
+			</effect_group>
+		</buff>
+	</append>
+</configs>

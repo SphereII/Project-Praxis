@@ -1,0 +1,54 @@
+<configs>
+	<append xpath="/buffs/buff[@name='buffLBD_PerceptionManager']">
+		<effect_group name="Demolitions Expert">
+
+			<triggered_effect trigger="onSelfExplosionDamagedOther" action="ModifyCVar" cvar="$perkdemolitionsexpert_lbd_xp" operation="add" value="@$lbd_xp_demolitions_bonus">
+				<requirement name="IsAlive" target="other"/>
+			</triggered_effect>
+
+			<triggered_effect trigger="onSelfExplosionDamagedOther" action="AddBuff" buff="buffLBD_perkDemolitionsExpert_LevelUpCheck">
+				<requirement name="CVarCompare" cvar="$perkdemolitionsexpert_lbd_xp" operation="GTE" value="@$perkdemolitionsexpert_lbd_xptonext"/>
+			</triggered_effect>
+
+			<triggered_effect trigger="onSelfExplosionAttackedOther" action="ModifyCVar" cvar="$perkdemolitionsexpert_lbd_xp" operation="add" value="@$lbd_xp_demolitions_bonus">
+				<requirement name="IsAlive" target="other"/>
+			</triggered_effect>
+
+			<triggered_effect trigger="onSelfExplosionAttackedOther" action="AddBuff" buff="buffLBD_perkDemolitionsExpert_LevelUpCheck">
+				<requirement name="CVarCompare" cvar="$perkdemolitionsexpert_lbd_xp" operation="GTE" value="@$perkdemolitionsexpert_lbd_xptonext"/>
+			</triggered_effect>
+
+			<triggered_effect trigger="onSelfExplosionDamagedOther" action="LogMessageCVars, SCore" message="LBD DEBUG: Demolitions Expert (Damaged) - Explosion Hit! Attempting XP Gain (+@$lbd_xp_demolitions_bonus)">
+				<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+				<requirement name="IsAlive" target="other"/>
+			</triggered_effect>
+			<triggered_effect trigger="onSelfExplosionAttackedOther" action="LogMessageCVars, SCore" message="LBD DEBUG: Demolitions Expert (Attacked) - Explosion Hit! Attempting XP Gain (+@$lbd_xp_demolitions_bonus)">
+				<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+				<requirement name="IsAlive" target="other"/>
+			</triggered_effect>
+		</effect_group>
+	</append>
+	<append xpath="/buffs">
+		<!-- Level-Up Handler for Demolitions Expert -->
+		<buff name="buffLBD_perkDemolitionsExpert_LevelUpCheck" hidden="true">
+			<stack_type value="ignore"/>
+			<duration value="1"/>
+			<effect_group>
+				<requirement name="CanPurchasePerk, SCore" progression_name="perkDemolitionsExpert"/>
+				<triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Demolitions Expert - Level Up SUCCESS (perkDemolitionsExpert)">
+				    <requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+				</triggered_effect>
+				<triggered_effect trigger="onSelfBuffStart" action="AddProgressionLevel" progression_name="perkDemolitionsExpert" level="1"/>
+				<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkdemolitionsexpert_lbd_xp" operation="subtract" value="@$perkdemolitionsexpert_lbd_xptonext"/>
+				<triggered_effect trigger="onSelfBuffStart" action="ModifyCVar" cvar="$perkdemolitionsexpert_lbd_xptonext" operation="multiply" value="1.2"/>
+				<triggered_effect trigger="onSelfBuffStart" action="ShowToolbeltMessage" message_key="perkDemolitionsExpertLeveledUp"/>
+			</effect_group>
+			<effect_group>
+				<requirement name="!CanPurchasePerk, SCore" progression_name="perkDemolitionsExpert"/>
+				<triggered_effect trigger="onSelfBuffStart" action="LogMessageCVars, SCore" message="LBD DEBUG: Demolitions Expert - Level Up FAILED. Perk is locked by requirements.">
+					<requirement name="CVarCompare" cvar="$lbd_debug" operation="GTE" value="1"/>
+				</triggered_effect>
+			</effect_group>
+		</buff>
+	</append>
+</configs>
